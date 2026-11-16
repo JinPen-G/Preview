@@ -67,23 +67,12 @@ export async function approvedMain(config, request = fetch) {
 export async function updateFromGithub(config, { request = fetch } = {}) {
   const deploy = await readDeploymentConfig(config.deployConfig);
   validateWorkspace(config, deploy);
-  const business = await readBusinessPackage(config.businessPackage);
   const approved = await approvedMain(config, request);
   if (!approved) {
     console.log('Waiting for a successful main workflow.');
     return { status: 'waiting-for-ci' };
   }
-  const stateFile = path.join(deploy.stateRoot, 'auto-update.json');
-  const state = await readJson(stateFile);
-  const current = await readJson(path.join(deploy.releaseRoot, 'current.json'));
-  if (
-    state?.commit === approved.commit &&
-    state.businessVersion === business.version &&
-    state.releaseId === current?.releaseId
-  ) {
-    console.log('Framework and fixed business package are current.');
-    return { status: 'current', releaseId: current.releaseId };
-  }
+  // Reserve host capacity before decoding the private business sources into memory.
   const meminfo = await fs.readFile('/proc/meminfo', 'utf8');
   const available = Number(/^MemAvailable:\s+(\d+)/m.exec(meminfo)?.[1] || 0) / 1024;
   if (available < config.minimumAvailableMemoryMiB) {
@@ -94,6 +83,18 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
   if ((disk.bavail * disk.bsize) / (1024 * 1024) < config.minimumAvailableDiskMiB) {
     console.log('Deferring build until sufficient disk space is available.');
     return { status: 'waiting-for-disk' };
+  }
+  const business = await readBusinessPackage(config.businessPackage);
+  const stateFile = path.join(deploy.stateRoot, 'auto-update.json');
+  const state = await readJson(stateFile);
+  const current = await readJson(path.join(deploy.releaseRoot, 'current.json'));
+  if (
+    state?.commit === approved.commit &&
+    state.businessVersion === business.version &&
+    state.releaseId === current?.releaseId
+  ) {
+    console.log('Framework and fixed business package are current.');
+    return { status: 'current', releaseId: current.releaseId };
   }
   await fs.mkdir(config.workRoot, { recursive: true, mode: 0o700 });
   if ((await fs.realpath(config.workRoot)) !== path.resolve(config.workRoot))
