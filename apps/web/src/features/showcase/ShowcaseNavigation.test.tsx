@@ -337,6 +337,10 @@ describe('showcase catalog navigation', () => {
     expect(within(header).queryByRole('button', { name: '选择休息时长' })).not.toBeInTheDocument();
     fireEvent.click(navigation);
     const drawer = await screen.findByRole('dialog', { name: '页面导航' });
+    expect(within(drawer).getByRole('link', { name: 'Nativark' })).toHaveAttribute(
+      'href',
+      'https://rentaltest.rimo.pro:8080/',
+    );
     expect(within(drawer).getByRole('link', { name: '登录' })).toHaveAttribute('href', '/login');
     fireEvent.click(within(drawer).getByRole('button', { name: '选择休息时长' }));
     expect(await screen.findByRole('button', { name: '休息 10 分钟' })).toBeInTheDocument();
@@ -359,6 +363,12 @@ describe('showcase catalog navigation', () => {
     mount('/docs?project=rental');
     for (const link of screen.getAllByRole('link', { name: 'Try the demo' }))
       expect(link).toHaveAttribute('href', '/demo?project=rental');
+    const navigation = screen.getByRole('navigation', { name: '主导航' });
+    const platform = within(navigation).getByRole('link', { name: 'Nativark' });
+    expect(platform).toHaveAttribute('href', 'https://rentaltest.rimo.pro:8080/');
+    expect(platform).toHaveAttribute('target', '_blank');
+    expect(platform).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(within(navigation).getByRole('link', { name: 'Try the demo' }).nextElementSibling).toBe(platform);
   });
 
   it('keeps the front-end project after returning home instead of selecting the first catalog item', async () => {

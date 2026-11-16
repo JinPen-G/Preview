@@ -499,6 +499,14 @@ body[data-preview-view='showcase'] #root {
 .preview-showcase .showcase-demo-navigation:hover {
   background: var(--surface-muted);
 }
+.preview-showcase a.showcase-platform-link {
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.preview-showcase nav > a.showcase-platform-link {
+  display: inline-flex;
+}
 @media (max-width: 1100px) {
   .preview-showcase .site-nav_headerActions__pddgO .showcase-search-launch,
   .preview-showcase .page_topActions__2fJLa .showcase-search-launch,

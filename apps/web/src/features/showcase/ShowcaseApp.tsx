@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Code2,
   Eye,
+  ExternalLink,
   FileText,
   LockKeyhole,
   Maximize2,
@@ -115,6 +116,7 @@ const Password = lazy(() =>
   import('@/features/platform/PasswordForm').then((module) => ({ default: module.PasswordForm })),
 );
 const publicClient = createNativeClient();
+const nativarkUrl = 'https://rentaltest.rimo.pro:8080/';
 const RequirementGraphPage = lazy(() => import('./RequirementGraphPage'));
 interface PageDetail extends CatalogPage {
   description?: string;
@@ -907,6 +909,9 @@ function Site() {
         </Link>
         <Link to="/docs/ai">AI 接入</Link>
         <Link to={demoDestination}>Try the demo</Link>
+        <a className="showcase-platform-link" href={nativarkUrl} target="_blank" rel="noopener noreferrer">
+          Nativark <ExternalLink size={13} aria-hidden="true" />
+        </a>
         {session?.user?.role === 'admin' && <Link to="/manage/projects">管理后台</Link>}
       </nav>
       <div className={home ? 'site-nav_headerActions__pddgO' : 'page_topActions__2fJLa'}>
@@ -957,6 +962,14 @@ function Site() {
       <Link className="showcase-demo-navigation" to={demoDestination}>
         Try the demo
       </Link>
+      <a
+        className="showcase-demo-navigation showcase-platform-link"
+        href={nativarkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Nativark <ExternalLink size={13} aria-hidden="true" />
+      </a>
       <CatalogFilters
         inputRef={searchInput}
         search={filter}
