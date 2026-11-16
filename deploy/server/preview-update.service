@@ -21,9 +21,10 @@ ProtectSystem=strict
 ReadWritePaths=/var/lib/preview/update /var/lib/preview/data /var/lib/preview/backups /opt/preview/releases /opt/preview/state
 Nice=19
 CPUQuota=100%
-MemoryHigh=2304M
-MemoryMax=3G
+MemoryHigh=3G
+MemoryMax=4G
 IOSchedulingClass=idle
 IOWeight=10
-Environment=NODE_OPTIONS=--max-old-space-size=2048
+Environment=NODE_OPTIONS=--max-old-space-size=3072
+LimitCORE=0
 

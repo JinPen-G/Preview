@@ -23,7 +23,7 @@ function validateWorkspace(config, deploy) {
     relative.startsWith('..') ||
     path.isAbsolute(relative) ||
     !Number.isSafeInteger(config.minimumAvailableMemoryMiB) ||
-    config.minimumAvailableMemoryMiB < 2048 ||
+    config.minimumAvailableMemoryMiB < 5120 ||
     !Number.isSafeInteger(config.minimumAvailableDiskMiB) ||
     config.minimumAvailableDiskMiB < 4096
   )

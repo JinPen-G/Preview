@@ -39,7 +39,7 @@ npm run business:package -- --project your-project --output .preview-data/busine
   "deployConfig": "/etc/preview/deploy.json",
   "businessPackage": "/var/lib/preview/business/project.json",
   "workRoot": "/var/lib/preview/update",
-  "minimumAvailableMemoryMiB": 4096,
+  "minimumAvailableMemoryMiB": 5120,
   "minimumAvailableDiskMiB": 6144,
   "guardCommand": ["/path/to/approved-read-only-server-check"]
 }
