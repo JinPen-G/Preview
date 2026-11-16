@@ -1,9 +1,9 @@
 // @vitest-environment node
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { approvedMain, cleanupUpdateWorkspaces } from '../../scripts/github-update.mjs';
+import { approvedMain, cleanupUpdateWorkspaces, updateFromGithub } from '../../scripts/github-update.mjs';
 import {
   packageBusiness,
   readBusinessPackage,
@@ -181,4 +181,56 @@ test('interrupted updater cleanup removes only its managed build directories', a
   expect(await fs.readFile(path.join(workRoot, 'npm-cache/cache.txt'), 'utf8')).toBe(
     'managed download cache',
   );
+});
+async function resourceFixture(availableMiB) {
+  const item = await fixture();
+  const installRoot = path.join(item.root, 'install');
+  const storageRoot = path.join(item.root, 'storage');
+  await fs.mkdir(storageRoot);
+  await json(path.join(installRoot, 'releases/current.json'), { releaseId: 'aaaaaaaaaaaa-bbbbbbbbbbbb' });
+  await json(path.join(installRoot, 'state/auto-update.json'), {
+    commit,
+    businessVersion: item.packaged.version,
+    releaseId: 'aaaaaaaaaaaa-bbbbbbbbbbbb',
+  });
+  const deployConfig = path.join(item.root, 'deploy.json');
+  await json(deployConfig, {
+    schemaVersion: 1,
+    installRoot,
+    storageRoot,
+    publicOrigin: 'http://127.0.0.1:41999',
+    port: 41999,
+    service: 'preview.service',
+    node: process.execPath,
+  });
+  const read = fs.readFile.bind(fs);
+  vi.spyOn(fs, 'readFile').mockImplementation((filename, ...args) => {
+    if (filename === '/proc/meminfo')
+      return Promise.resolve('MemAvailable: ' + availableMiB * 1024 + ' kB\n');
+    if (filename === '/proc/self/status')
+      return Promise.resolve('RssAnon: ' + 150 * 1024 + ' kB\nRssFile: ' + 80 * 1024 + ' kB\n');
+    return read(filename, ...args);
+  });
+  vi.spyOn(fs, 'statfs').mockResolvedValue({ bavail: 10 * 1024 * 1024, bsize: 4096 });
+  return {
+    ...config,
+    deployConfig,
+    businessPackage: item.filename,
+    workRoot: path.join(storageRoot, 'update'),
+    minimumAvailableMemoryMiB: 5120,
+    minimumAvailableDiskMiB: 6144,
+  };
+}
+test('an already current release does not reserve the updater anonymous memory twice', async () => {
+  const options = await resourceFixture(4990);
+  expect(await updateFromGithub(options, { request: github(workflow()) })).toMatchObject({
+    status: 'current',
+  });
+});
+test('genuinely insufficient capacity defers before decoding private business input', async () => {
+  const options = await resourceFixture(4400);
+  options.businessPackage = path.join(tmpdir(), 'missing-business-package.json');
+  expect(await updateFromGithub(options, { request: github(workflow()) })).toMatchObject({
+    status: 'waiting-for-memory',
+  });
 });

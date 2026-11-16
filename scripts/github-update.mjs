@@ -73,8 +73,16 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
     return { status: 'waiting-for-ci' };
   }
   // Reserve host capacity before decoding the private business sources into memory.
-  const meminfo = await fs.readFile('/proc/meminfo', 'utf8');
-  const available = Number(/^MemAvailable:\s+(\d+)/m.exec(meminfo)?.[1] || 0) / 1024;
+  const [meminfo, status] = await Promise.all([
+    fs.readFile('/proc/meminfo', 'utf8'),
+    fs.readFile('/proc/self/status', 'utf8'),
+  ]);
+  // This process is already inside MemoryMax. Count its allocated anonymous pages
+  // toward that same build budget, without counting reclaimable file mappings twice.
+  const available =
+    (Number(/^MemAvailable:\s+(\d+)/m.exec(meminfo)?.[1] || 0) +
+      Number(/^RssAnon:\s+(\d+)/m.exec(status)?.[1] || 0)) /
+    1024;
   if (available < config.minimumAvailableMemoryMiB) {
     console.log('Deferring build until sufficient memory is available.');
     return { status: 'waiting-for-memory' };
