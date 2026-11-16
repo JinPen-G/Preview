@@ -108,6 +108,20 @@ export async function buildRuntime({
     format: 'esm',
     define: { 'import.meta.previewBundled': 'true' },
   });
+  // The updater uses the installed deployment tool so its CLI guard remains independent.
+  await build({
+    absWorkingDir: root,
+    entryPoints: { update: 'scripts/github-update.mjs' },
+    outdir: toolsDestination,
+    plugins,
+    external: ['./deploy.mjs'],
+    outExtension: { '.js': '.mjs' },
+    bundle: true,
+    platform: 'node',
+    target: 'node24',
+    format: 'esm',
+    define: { 'import.meta.previewBundled': 'true' },
+  });
 
   return { inputs: Object.keys(result.metafile.inputs) };
 }

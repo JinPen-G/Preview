@@ -1,0 +1,11 @@
+[Unit]
+Description=Check GitHub main for Preview framework updates
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=3min
+AccuracySec=15s
+Unit=preview-update.service
+
+[Install]
+WantedBy=timers.target

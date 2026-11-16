@@ -14,6 +14,41 @@ schemaVersion 3 的发行包只有 manifest.json、web、runtime 和 project-con
 
 普通完整更新也会短暂进入维护模式；不承诺零停机。后台每30秒检查版本，提示用户保存表单并手动刷新，不强制打断表单。全局散列资产保留供旧标签页加载，私有源码和资料仍由当前版本与实时授权决定。
 
+## 固定业务包与框架自动更新
+
+业务内容可独立固定在服务器。使用下面的命令从当前明确登记的项目生成私有业务包，包含该项目的React入口、Registry源码、需求资料和资源。
+
+```powershell
+npm run business:package -- --project your-project --output .preview-data/business-package.json
+```
+
+业务包按文件记录SHA-256，并由整体版本标识固定。将其保存在服务器的私有目录，由root维护、preview账号只读。只有主动发布业务内容时才替换此包。数据库、用户、菜单和授权继续由原持久化目录维护。
+
+服务器可选用preview-update.service和preview-update.timer，每次完成后间隔三分钟检查GitHub的main分支。只有同一仓库、当前main提交的push工作流成功，才拉取固定提交并结合服务器业务包构建完整应用。框架的公开项目声明取自当前Git提交，业务声明追加到本地适配清单，不能覆盖框架已有文件。构建期间main或业务包改变时，等待下一轮重建。
+
+更新器采用独立依赖与构建目录，复用本服务下载缓存，并在退出后清理一次性源码及依赖。systemd限制构建CPU和内存；磁盘或可用内存不足时推迟构建。主机保护命令由运维写入root维护的配置，在构建、部署前后核对共享服务。
+
+完整构建通过后沿用原发行校验、数据库备份、维护模式、增量迁移和失败恢复。候选服务还必须保留业务页面清单及公开范围，才会激活。成功后记录框架提交和固定业务版本，后续轮询相同版本时跳过构建。
+
+配置文件使用/etc/preview/auto-update.json，其格式示例如下。
+
+```json
+{
+  "repository": "your-org/your-preview",
+  "workflow": "release.yml",
+  "deployConfig": "/etc/preview/deploy.json",
+  "businessPackage": "/var/lib/preview/business/project.json",
+  "workRoot": "/var/lib/preview/update",
+  "minimumAvailableMemoryMiB": 4096,
+  "minimumAvailableDiskMiB": 6144,
+  "guardCommand": ["/path/to/approved-read-only-server-check"]
+}
+```
+
+使用build:runtime生成的output/tools/update.mjs及同目录deploy.mjs。运维安装服务模板时，将@NODE@替换成实际Node绝对路径，建立preview账号可写的构建目录，并使业务包目录保持只读。更新器需沿用preview账号仅start/stop preview.service的sudo权限，保护命令如需特权应单独授权精确命令。unit使用flock防止并发，并在进程中断后清理该更新器拥有的build目录。
+
+启用此方式时，PREVIEW_DEPLOY_ENABLED保持未设置或false，GitHub仅生成公开框架发行并提供检查结果。服务器通过HTTPS拉取公开代码，私有业务包保存在服务器。该方式不依赖部署SSH私钥或GitHub Secrets。日志通过journalctl -u preview-update.service和私有构建目录last-build.log读取，框架/业务版本记录在/opt/preview/state/auto-update.json。
+
 ## 首次服务器准备
 
 个人测试沿用独立的Preview服务与SQLite。首次可将入口设为`http://localhost:8088`，安装器会让Nginx仅监听服务器回环地址；通过SSH隧道访问，账号请求随SSH加密传输。应用也兼容普通HTTP下的UI随机标识和主动复制操作。公网及团队入口使用HTTPS。

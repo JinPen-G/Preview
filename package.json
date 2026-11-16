@@ -45,8 +45,8 @@
     "build:runtime": "node scripts/build-runtime.mjs",
     "build:framework": "node scripts/build-framework.mjs",
     "structure:check": "node scripts/check-structure.mjs",
-    "lint:deploy": "eslint scripts/{deploy,deployment-config,deployment-smoke,supervisor,release,build-runtime,backup,migrate,initialize-admin,dev}.mjs apps/api/main.mjs apps/web/src/browser-compatibility.ts packages/project-core/src/platform/schema.js packages/project-core/src/platform/store.js packages/project-core/src/platform/project-content.js packages/platform-server/src/{server,client-address,rest-media}.js packages/platform-contracts/src/rest-media.js",
-    "test:deploy": "vitest run tests/unit/deployment-readiness.spec.js apps/web/src/browser-compatibility.test.ts tests/unit/release.spec.js tests/unit/audio-response.spec.js",
+    "lint:deploy": "eslint scripts/{deploy,deployment-config,deployment-smoke,supervisor,release,build-runtime,backup,migrate,initialize-admin,dev,business-package,github-update}.mjs apps/api/main.mjs apps/web/src/browser-compatibility.ts packages/project-core/src/platform/schema.js packages/project-core/src/platform/store.js packages/project-core/src/platform/project-content.js packages/platform-server/src/{server,client-address,rest-media}.js packages/platform-contracts/src/rest-media.js",
+    "test:deploy": "vitest run tests/unit/deployment-readiness.spec.js apps/web/src/browser-compatibility.test.ts tests/unit/release.spec.js tests/unit/audio-response.spec.js tests/unit/github-update.spec.js",
     "release:smoke": "node scripts/deployment-smoke.mjs",
     "deploy": "node scripts/deploy.mjs",
     "deploy:native": "npm run deploy",
@@ -59,7 +59,8 @@
     "backup:native": "npm run backup",
     "restore": "node scripts/backup.mjs restore",
     "restore:native": "npm run restore",
-    "admin:initialize": "node scripts/initialize-admin.mjs"
+    "admin:initialize": "node scripts/initialize-admin.mjs",
+    "business:package": "node scripts/business-package.mjs package"
   },
   "dependencies": {
     "@animate-ui/react": "2.3.0",
