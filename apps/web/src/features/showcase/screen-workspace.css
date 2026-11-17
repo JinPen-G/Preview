@@ -84,6 +84,18 @@
 .showcase-screen-workspace [data-sidebar='group-label']:empty {
   display: none;
 }
+.showcase-screen-workspace .rental-sidebar-group-chevron {
+  margin-inline-start: auto;
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.showcase-screen-workspace .rental-menu-group[data-open] .rental-sidebar-group-chevron {
+  transform: rotate(90deg);
+}
+html[data-reduced-motion='true'] .showcase-screen-workspace .rental-sidebar-group-chevron {
+  transition: none;
+}
 .preview-screen-account strong {
   font-size: 13px;
   font-weight: 500;

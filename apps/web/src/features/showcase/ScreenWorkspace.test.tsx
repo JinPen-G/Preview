@@ -40,6 +40,14 @@ function Location() {
 }
 
 beforeEach(() => {
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] });
   Object.defineProperty(Element.prototype, 'animate', {
     configurable: true,
@@ -83,6 +91,7 @@ it('keeps business dialogs inside the scaled screen and restores their trigger',
 });
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   delete (Element.prototype as { getAnimations?: unknown }).getAnimations;
   delete (Element.prototype as { animate?: unknown }).animate;
 });
@@ -115,7 +124,8 @@ it('keeps the full application navigation mounted across preview sizes without a
     'href',
     '#/pages/rental/company/employees',
   );
-  expect(view.container.querySelector('.preview-breadcrumb')).toHaveTextContent('RentalVehicles');
+  expect(view.container.querySelector('.preview-breadcrumb')).toHaveTextContent('FleetVehicles');
+  expect(screen.getByRole('button', { name: 'Fleet' })).toHaveAttribute('aria-expanded', 'true');
   expect(screen.queryByRole('link', { name: 'Button' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '本页文档' })).not.toBeInTheDocument();
   const input = screen.getByRole('textbox', { name: 'Business draft' });

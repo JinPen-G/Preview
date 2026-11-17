@@ -153,9 +153,40 @@ it('combines the visible front-end pages in the existing shell without managemen
   expect(screen.queryByText('账号管理')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '本页文档' })).not.toBeInTheDocument();
   expect(document.querySelector('a[href^="#/manage"]')).toBeNull();
-  expect(document.querySelector('.preview-breadcrumb')).toHaveTextContent('Samplevehicle-groups');
-  expect(screen.queryByRole('button', { name: '车辆管理' })).not.toBeInTheDocument();
+  expect(document.querySelector('.preview-breadcrumb')).toHaveTextContent('车辆管理vehicle-groups');
+  expect(screen.getByRole('button', { name: '车辆管理' })).toHaveAttribute('aria-expanded', 'true');
   expect(screen.queryByRole('link', { name: /图谱/ })).not.toBeInTheDocument();
+});
+it('groups pages into business menus and searches both group names and child titles', async () => {
+  pages = [
+    { ...page('same-station'), title: '营运端 · 同站租还', category: '营运端 · 订单中心' },
+    { ...page('one-way'), title: '甲租乙还', category: '营运端 · 订单中心' },
+    { ...page('vehicle-groups'), title: '车型组管理', category: '营运端 · 车辆管理' },
+    { ...page('locked'), title: '无权查看', category: '营运端 · 受限功能', allowed: false },
+    { ...page('other'), projectId: 'other', category: '其他项目' },
+  ];
+  mount('/demo?project=sample');
+  await screen.findByTestId('runtime');
+  const orders = screen.getByRole('button', { name: '订单中心' });
+  const sameStation = screen.getByRole('link', { name: '同站租还' });
+  expect(orders).toHaveAttribute('aria-expanded', 'true');
+  expect(sameStation.closest('[role="group"]')).toHaveAttribute('aria-label', '订单中心');
+  expect(screen.queryByRole('button', { name: '受限功能' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '其他项目' })).not.toBeInTheDocument();
+  fireEvent.click(orders);
+  expect(screen.queryByRole('link', { name: '同站租还' })).not.toBeInTheDocument();
+  fireEvent.click(orders);
+  expect(screen.getByRole('link', { name: '同站租还' })).toBe(sameStation);
+  const search = screen.getByRole('searchbox');
+  fireEvent.change(search, { target: { value: '车辆管理' } });
+  fireEvent.click(screen.getByRole('link', { name: '车型组管理' }));
+  await waitFor(() => expect(screen.getByTestId('runtime')).toHaveTextContent('vehicle-groups'));
+  fireEvent.change(search, { target: { value: '甲租乙还' } });
+  expect(screen.getByRole('button', { name: '订单中心' })).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('link', { name: '甲租乙还' })).toBeVisible();
+  fireEvent.click(screen.getByRole('link', { name: '甲租乙还' }));
+  await waitFor(() => expect(screen.getByTestId('runtime')).toHaveTextContent('one-way'));
+  expect(document.querySelector('.preview-breadcrumb')).toHaveTextContent('订单中心甲租乙还');
 });
 it('switches project menus, resets search and includes all readable clients with plain titles', async () => {
   auth.session.user = null;

@@ -1,6 +1,6 @@
 /** Rental OS sidebar composition, with Preview-owned navigation and account ports.
  * Primitives, menu geometry and motion come from the fixed source snapshot. */
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Highlight, HighlightItem } from '@animate-ui/react/primitives/effects/highlight';
 import { toCssTiming, useTempoTransition } from '@animate-ui/react/utils/motion';
 import { motion } from 'motion/react';
@@ -11,6 +11,7 @@ import {
   LanguageSkillIcon,
   Logout01Icon,
   Tick02Icon,
+  ArrowRight01Icon,
 } from '@hugeicons/core-free-icons';
 import {
   BookOpen,
@@ -130,19 +131,26 @@ function Navigation({
   embedded?: boolean;
 }) {
   const { state, isMobile, setOpenMobile } = useSidebar();
+  const submenuId = useId();
   const { reducedMotion } = useUiEnvironment();
   const layoutTransition = useTempoTransition(CONSOLE_SIDEBAR_MOTION.layout);
   const enterTransition = useTempoTransition(CONSOLE_SIDEBAR_MOTION.contentEnter);
   const exitTransition = useTempoTransition(CONSOLE_SIDEBAR_MOTION.contentExit);
-  const submenuTransition = { ...layoutTransition, opacity: enterTransition };
-  const submenuExitTransition = { ...layoutTransition, opacity: exitTransition };
+  const submenuTransition = { height: layoutTransition, opacity: enterTransition };
+  const submenuExitTransition = { height: layoutTransition, opacity: exitTransition };
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [popup, setPopup] = useState<string | null>(null);
   const keyword = query.trim().toLocaleLowerCase();
   const visible = sections
     .map((section) => ({
       ...section,
-      routes: section.routes.filter((route) => !keyword || route.label.toLocaleLowerCase().includes(keyword)),
+      routes: section.routes.filter(
+        (route) =>
+          !keyword ||
+          [section.label, route.label, route.qualifier ?? ''].some((label) =>
+            label.toLocaleLowerCase().includes(keyword),
+          ),
+      ),
     }))
     .filter((section) => section.routes.length || (keepEmptySections && !keyword));
   const collapsed = !embedded && !isMobile && state === 'collapsed';
@@ -209,7 +217,7 @@ function Navigation({
               ));
             const groupOpen = expanded(section);
             const panelOpen = groupOpen && !collapsed;
-            const panelId = `preview-menu-${encodeURIComponent(section.key)}`;
+            const panelId = `${submenuId}-preview-menu-${encodeURIComponent(section.key)}`;
             return (
               <DropdownMenu
                 key={section.key}
@@ -220,7 +228,7 @@ function Navigation({
                     details.cancel();
                     return;
                   }
-                  setPopup(open ? section.key : null);
+                  setPopup((current) => (open ? section.key : current === section.key ? null : current));
                 }}
               >
                 <SidebarMenuItem className="rental-menu-group" data-open={panelOpen || undefined}>
@@ -228,6 +236,7 @@ function Navigation({
                     <div className="rental-sidebar-route-target">
                       <DropdownMenuTrigger
                         aria-label={section.label}
+                        aria-haspopup={collapsed ? 'menu' : undefined}
                         aria-expanded={collapsed ? popup === section.key : groupOpen}
                         aria-controls={collapsed ? undefined : panelId}
                         onClick={() => {
@@ -240,9 +249,9 @@ function Navigation({
                         <span className="rental-sidebar-label" title={section.label}>
                           {section.label}
                         </span>
-                        <ChevronRight
-                          size={13}
-                          strokeWidth={1.75}
+                        <HugeiconsIcon
+                          icon={ArrowRight01Icon}
+                          strokeWidth={2}
                           className="rental-sidebar-group-chevron"
                           aria-hidden="true"
                         />
@@ -291,6 +300,9 @@ function Navigation({
                                 }}
                               >
                                 <span>{route.label}</span>
+                                {route.qualifier && (
+                                  <small className="preview-route-qualifier">{route.qualifier}</small>
+                                )}
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           </HighlightItem>
@@ -301,6 +313,7 @@ function Navigation({
                 </SidebarMenuItem>
                 <DropdownMenuContent
                   className="rental-sidebar-submenu"
+                  aria-label={section.label}
                   side="right"
                   align="start"
                   sideOffset={8}
@@ -326,6 +339,9 @@ function Navigation({
                         aria-current={route.key === selectedKey ? 'page' : undefined}
                       >
                         <span>{route.label}</span>
+                        {route.qualifier && (
+                          <small className="preview-route-qualifier">{route.qualifier}</small>
+                        )}
                         {route.key === selectedKey && <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} />}
                       </DropdownMenuItem>
                     ))}

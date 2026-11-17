@@ -168,3 +168,27 @@ test('Chinese menu groups retain unique disclosure targets', () => {
   expect(document.getElementById(fleet as string)).toHaveAttribute('aria-label', 'Fleet');
   expect(document.getElementById(orders as string)).toHaveAttribute('aria-label', 'Orders');
 });
+
+test('separate screen shells keep their disclosure targets distinct', () => {
+  mount();
+  mount({ embedded: true });
+  const targets = screen
+    .getAllByRole('button', { name: 'Fleet' })
+    .map((button) => button.getAttribute('aria-controls'));
+  expect(targets).toHaveLength(2);
+  expect(new Set(targets).size).toBe(2);
+  for (const id of targets) expect(document.getElementById(id!)).toHaveAttribute('aria-label', 'Fleet');
+});
+
+test('collapsed menus open the reference popup and close after navigation', async () => {
+  const view = mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+  await waitFor(() =>
+    expect(view.container.querySelector('[data-slot="sidebar"]')).toHaveAttribute('data-state', 'collapsed'),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Orders' }));
+  const menu = await screen.findByRole('menu', { name: 'Orders' });
+  fireEvent.click(within(menu).getByRole('menuitem', { name: 'Reservations' }));
+  expect(view.props.onNavigate).toHaveBeenCalledExactlyOnceWith('/orders');
+  await waitFor(() => expect(screen.queryByRole('menu', { name: 'Orders' })).not.toBeInTheDocument());
+});

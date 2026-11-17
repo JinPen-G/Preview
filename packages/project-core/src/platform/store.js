@@ -81,6 +81,16 @@ export function createNativeStore({
       module.pages.map((page) => [`${module.key}/${page.key}`, page.kind ?? 'page']),
     ),
   );
+  const navigationPages = new Map(
+    moduleCatalog.flatMap((module) =>
+      (module.navigation ?? [])
+        .flatMap((group) => group.pages.map((key) => ({ key, group: group.label.trim() })))
+        .map((page, order) => [
+          `${module.key}/${page.key}`,
+          { navigationGroup: page.group, navigationOrder: order },
+        ]),
+    ),
+  );
   if (Object.keys(modules).length !== moduleCatalog.length) fail(500, '原生模块重复注册', 'REGISTRY_INVALID');
   const directory = path.resolve(dataDirectory);
   mkdirSync(directory, { recursive: true });
@@ -711,6 +721,7 @@ export function createNativeStore({
               access: page.access ?? 'restricted',
               allowed,
               ...(featuredOrder === undefined ? {} : { featuredOrder }),
+              ...navigationPages.get(`${row.module_key}/${page.key}`),
             });
           }
       }

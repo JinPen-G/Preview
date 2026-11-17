@@ -37,6 +37,7 @@ export function validateProjectRegistration(input, existingModules = [], existin
     'surface',
     'pages',
     'initialClients',
+    'navigation',
   ]);
   requireValue(
     input?.schemaVersion === 1 && module && id(module.key) && id(module.projectId),
@@ -78,6 +79,30 @@ export function validateProjectRegistration(input, existingModules = [], existin
       featuredOrders.add(page.featuredOrder);
     }
     requireValue(page.sourceFiles === undefined, '依赖源码由Registry统一推导，请勿另写sourceFiles');
+  }
+  if (module.navigation !== undefined) {
+    requireValue(Array.isArray(module.navigation) && module.navigation.length <= 128, '导航分组无效');
+    const labels = new Set();
+    const assigned = new Set();
+    for (const group of module.navigation) {
+      allowedKeys(group, ['label', 'pages']);
+      requireValue(
+        typeof group.label === 'string' &&
+          group.label.trim() &&
+          group.label.length <= 160 &&
+          !labels.has(group.label.trim()),
+        '导航分组名称无效或重复',
+      );
+      labels.add(group.label.trim());
+      requireValue(
+        Array.isArray(group.pages) && group.pages.length > 0 && group.pages.length <= 128,
+        '导航页面清单无效',
+      );
+      for (const key of group.pages) {
+        requireValue(keys.has(key) && !assigned.has(key), '导航页面未登记或重复');
+        assigned.add(key);
+      }
+    }
   }
   const registry = input.registry ?? [];
   validateComponentRegistry([...existingRegistry, ...registry]);

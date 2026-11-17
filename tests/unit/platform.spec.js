@@ -61,6 +61,7 @@ test('homepage selection metadata preserves menu permissions and does not rewrit
     moduleCatalog: [
       {
         key: 'demo-module',
+        navigation: [{ label: 'Inventory', pages: ['hidden-page', 'private-page', 'public-page'] }],
         pages: [
           { key: 'public-page', featuredOrder: 2, kind: 'page' },
           { key: 'private-page', featuredOrder: 1, kind: 'component' },
@@ -85,7 +86,15 @@ test('homepage selection metadata preserves menu permissions and does not rewrit
       },
     ],
   });
-  expect(store.pageCatalog()).toMatchObject([{ pageKey: 'public-page', featuredOrder: 2, kind: 'page' }]);
+  expect(store.pageCatalog()).toMatchObject([
+    {
+      pageKey: 'public-page',
+      featuredOrder: 2,
+      kind: 'page',
+      navigationGroup: 'Inventory',
+      navigationOrder: 2,
+    },
+  ]);
   expect(store.pageCatalog()).toHaveLength(1);
   expect(store.pageCatalog(admin).map((page) => [page.pageKey, page.featuredOrder])).toEqual([
     ['public-page', 2],

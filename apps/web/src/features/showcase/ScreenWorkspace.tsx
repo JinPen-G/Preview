@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Layers3 } from 'lucide-react';
+import { Layers3 } from 'lucide-react';
 import { FrameworkShell, ScreenPortalProvider, UiEnvironmentProvider } from '@preview/ui';
 import { Button } from '@preview/ui/admin';
 import { LoadingStage } from '@preview/ui/loading';
@@ -11,7 +11,8 @@ import { usePrefersReducedMotion } from '@/features/motion/use-motion-preference
 import { useShellLabels } from '@/features/shell/shell-labels';
 import { useShowcasePages, type CatalogPage } from './showcase-catalog';
 import { useShowcaseText } from './showcase-locale';
-import { catalogKind, catalogPageQualifier, catalogPageTitle } from './catalog-sections';
+import { catalogKind } from './catalog-sections';
+import { screenNavigation } from './screen-navigation';
 import './screen-workspace.css';
 
 export function ScreenWorkspace({
@@ -53,23 +54,7 @@ export function ScreenWorkspace({
             showDocumentControl={false}
             account={session?.user?.displayName ?? text('访客')}
             accountDescription={text('公开浏览')}
-            sections={[
-              {
-                key: page.projectId,
-                label: page.projectName,
-                icon: <Layers3 size={16} />,
-                flat: true,
-                routes: pages.map((item) => {
-                  const qualifier = catalogPageQualifier(item, pages);
-                  return {
-                    key: path(item),
-                    label: text(catalogPageTitle(item)),
-                    icon: <FileText size={16} />,
-                    qualifier: qualifier ? text(qualifier) : undefined,
-                  };
-                }),
-              },
-            ]}
+            sections={screenNavigation(pages, page.projectId, path, text)}
             selectedKey={path(page)}
             onNavigate={navigate}
             preference={resolvedMode}

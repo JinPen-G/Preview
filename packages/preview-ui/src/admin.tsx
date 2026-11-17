@@ -5,6 +5,7 @@ import { App as AntApp } from 'antd';
 import { FeedbackProvider } from './admin-controls/runtime/apps/admin/src/components/ui/Feedback';
 export { Form } from './admin-controls/runtime/apps/admin/src/components/ui/Form';
 export { Button } from './admin-controls/runtime/apps/admin/src/components/ui/Button';
+export { AnimatedIcon } from './admin-controls/runtime/apps/admin/src/components/ui/AnimatedIcon';
 export { Table } from './admin-controls/runtime/apps/admin/src/components/ui/Table';
 export { Input } from './admin-controls/runtime/apps/admin/src/components/ui/Input';
 export { SearchField } from './admin-controls/runtime/apps/admin/src/components/ui/SearchField';

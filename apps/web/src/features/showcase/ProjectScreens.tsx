@@ -3,6 +3,7 @@ import type { CatalogPage, ShowcaseProject } from './showcase-catalog';
 import { catalogKind, catalogPageQualifier, catalogPageTitle } from './catalog-sections';
 import { SidebarSection } from './SidebarSection';
 import { LocalizedView, useShowcaseText } from './showcase-locale';
+import { orderedScreenPages } from './screen-navigation';
 
 export function ProjectScreens({
   projects,
@@ -26,7 +27,7 @@ export function ProjectScreens({
   return projects.map((project) => {
     const projectPages = screens.filter((page) => page.projectId === project.id);
     if (!projectPages.length) return null;
-    const rows = visible.filter((page) => page.projectId === project.id);
+    const rows = orderedScreenPages(visible.filter((page) => page.projectId === project.id));
     const graphPath = `/docs/graph?project=${encodeURIComponent(project.id)}`;
     const showGraph =
       projectPages.some((page) => page.allowed) &&

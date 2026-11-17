@@ -9,6 +9,7 @@ export const NATIVE_MODULES: readonly {
   clientId?: string;
   contentKey?: string;
   surface?: 'showcase';
+  navigation?: readonly { label: string; pages: readonly string[] }[];
   initialClients?: NativeClient[];
   pages: readonly {
     key: string;

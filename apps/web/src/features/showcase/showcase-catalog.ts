@@ -16,6 +16,8 @@ export interface CatalogPage {
   access: 'public' | 'restricted';
   allowed: boolean;
   featuredOrder?: number;
+  navigationGroup?: string;
+  navigationOrder?: number;
 }
 export interface ShowcaseProject {
   id: string;

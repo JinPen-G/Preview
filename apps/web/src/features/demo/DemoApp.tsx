@@ -3,14 +3,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Layers3 } from 'lucide-react';
-import {
-  BrandIcon,
-  ControlIdentityScope,
-  FrameworkShell,
-  UiEnvironmentProvider,
-  type ShellSection,
-} from '@preview/ui';
+import { ArrowLeft, Layers3 } from 'lucide-react';
+import { BrandIcon, ControlIdentityScope, FrameworkShell, UiEnvironmentProvider } from '@preview/ui';
 import { AdminFeedbackProvider, Alert, Button, Empty } from '@preview/ui/admin';
 import { LoadingStage } from '@preview/ui/loading';
 import { useNativeAuth } from '@/features/platform/platform-api';
@@ -28,7 +22,8 @@ import {
   type CatalogPage,
 } from '@/features/showcase/showcase-catalog';
 import { useShowcaseText } from '@/features/showcase/showcase-locale';
-import { catalogKind, catalogPageQualifier, catalogPageTitle } from '@/features/showcase/catalog-sections';
+import { catalogKind, catalogPageTitle } from '@/features/showcase/catalog-sections';
+import { orderedScreenPages, screenNavigation } from '@/features/showcase/screen-navigation';
 import { RuntimePage } from '@/features/showcase/RuntimePage';
 import { demoPageRoute, demoPageUrl } from './demo-routes';
 import { RestEntry } from '@/features/rest/RestEntry';
@@ -76,26 +71,12 @@ export function DemoWorkspace() {
   const pagesQuery = useShowcasePages(projectId, Boolean(project));
   const pages =
     project && !pagesQuery.error
-      ? (pagesQuery.data?.pages.filter((page) => page.allowed && catalogKind(page) === 'page') ?? [])
+      ? orderedScreenPages(
+          pagesQuery.data?.pages.filter((page) => page.allowed && catalogKind(page) === 'page') ?? [],
+        )
       : [];
   const selected = route && pages.find((page) => demoPageUrl(page) === location.pathname);
-  const sections: ShellSection[] = [
-    {
-      key: projectId,
-      label: project?.name ?? 'Demo',
-      icon: <Layers3 />,
-      flat: true,
-      routes: pages.map((page) => {
-        const qualifier = catalogPageQualifier(page, pages);
-        return {
-          key: demoPageUrl(page),
-          label: text(catalogPageTitle(page)),
-          icon: <FileText />,
-          qualifier: qualifier ? text(qualifier) : undefined,
-        };
-      }),
-    },
-  ];
+  const sections = screenNavigation(pages, projectId, demoPageUrl, text);
   const labels = {
     ...useShellLabels(),
     center: '',

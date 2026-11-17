@@ -22,6 +22,26 @@ import { TEST_PROJECT, TEST_MODULES } from '../fixtures/project-catalog.js';
 const registeredProjects = [TEST_PROJECT];
 
 const fixtures = [];
+test('screen navigation groups accept registered pages and reject duplicate or unknown entries', () => {
+  const definition = structuredClone(TEST_PROJECT);
+  definition.module.navigation = [
+    { label: 'Inventory', pages: definition.module.pages.map((page) => page.key) },
+  ];
+  expect(() => validateProjectRegistration(definition)).not.toThrow();
+  for (const group of [
+    { label: '', pages: ['item-groups'] },
+    { label: 'Inventory', pages: [] },
+    { label: 'Inventory', pages: ['unknown'] },
+    { label: 'Inventory', pages: ['item-groups', 'item-groups'] },
+  ]) {
+    const invalid = structuredClone(definition);
+    invalid.module.navigation = [group];
+    expect(() => validateProjectRegistration(invalid)).toThrow('导航');
+  }
+  definition.module.navigation.push({ label: 'Inventory', pages: ['item-transfer'] });
+  expect(() => validateProjectRegistration(definition)).toThrow('导航');
+});
+
 test('screen display entries retain the same installable block contract', () => {
   const definition = structuredClone(TEST_PROJECT);
   expect(definition.module.pages.every((page) => page.kind === 'page')).toBe(true);
