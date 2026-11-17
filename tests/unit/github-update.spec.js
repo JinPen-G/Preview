@@ -232,5 +232,27 @@ test('genuinely insufficient capacity defers before decoding private business in
   options.businessPackage = path.join(tmpdir(), 'missing-business-package.json');
   expect(await updateFromGithub(options, { request: github(workflow()) })).toMatchObject({
     status: 'waiting-for-memory',
+    availableMemoryMiB: 4550,
+    requiredMemoryMiB: 5120,
   });
+});
+
+test('a smaller build limit retains the host reserve and admits the matching memory budget', async () => {
+  const options = await resourceFixture(4500);
+  options.maximumBuildMemoryMiB = 3584;
+  options.minimumAvailableMemoryMiB = 4608;
+  expect(await updateFromGithub(options, { request: github(workflow()) })).toMatchObject({
+    status: 'current',
+  });
+});
+
+test.each([
+  { maximumBuildMemoryMiB: 3584, minimumAvailableMemoryMiB: 4500 },
+  { maximumBuildMemoryMiB: 4096, minimumAvailableMemoryMiB: 4608 },
+  { maximumBuildMemoryMiB: 2048, minimumAvailableMemoryMiB: 4608 },
+])('an unsafe build limit or missing host reserve is rejected %#', async (limits) => {
+  const options = { ...(await resourceFixture(6000)), ...limits };
+  await expect(updateFromGithub(options, { request: github(workflow()) })).rejects.toThrow(
+    'explicit memory/disk floors',
+  );
 });

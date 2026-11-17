@@ -22,9 +22,9 @@ ReadWritePaths=/var/lib/preview/update /var/lib/preview/data /var/lib/preview/ba
 Nice=19
 CPUQuota=100%
 MemoryHigh=3G
-MemoryMax=4G
+MemoryMax=3584M
 IOSchedulingClass=idle
 IOWeight=10
-Environment=NODE_OPTIONS=--max-old-space-size=3072
+Environment=NODE_OPTIONS=--max-old-space-size=2816
 LimitCORE=0
 

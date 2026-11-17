@@ -3,7 +3,7 @@ Description=Check GitHub main for Preview framework updates
 
 [Timer]
 OnBootSec=2min
-OnUnitInactiveSec=3min
+OnUnitInactiveSec=3h
 AccuracySec=15s
 Unit=preview-update.service
 

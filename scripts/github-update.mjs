@@ -18,12 +18,16 @@ async function removeBuildWorkspace(workspace, workRoot) {
 }
 function validateWorkspace(config, deploy) {
   const relative = path.relative(deploy.storageRoot, path.resolve(config.workRoot));
+  const maximumBuildMemoryMiB = config.maximumBuildMemoryMiB ?? 4096;
   if (
     !relative ||
     relative.startsWith('..') ||
     path.isAbsolute(relative) ||
+    !Number.isSafeInteger(maximumBuildMemoryMiB) ||
+    maximumBuildMemoryMiB < 3072 ||
+    maximumBuildMemoryMiB > 4096 ||
     !Number.isSafeInteger(config.minimumAvailableMemoryMiB) ||
-    config.minimumAvailableMemoryMiB < 5120 ||
+    config.minimumAvailableMemoryMiB < maximumBuildMemoryMiB + 1024 ||
     !Number.isSafeInteger(config.minimumAvailableDiskMiB) ||
     config.minimumAvailableDiskMiB < 4096
   )
@@ -84,8 +88,12 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
       Number(/^RssAnon:\s+(\d+)/m.exec(status)?.[1] || 0)) /
     1024;
   if (available < config.minimumAvailableMemoryMiB) {
-    console.log('Deferring build until sufficient memory is available.');
-    return { status: 'waiting-for-memory' };
+    const capacity = {
+      availableMemoryMiB: Math.floor(available),
+      requiredMemoryMiB: config.minimumAvailableMemoryMiB,
+    };
+    console.log(`Deferring build until sufficient memory is available: ${JSON.stringify(capacity)}`);
+    return { status: 'waiting-for-memory', ...capacity };
   }
   const disk = await fs.statfs(deploy.storageRoot);
   if ((disk.bavail * disk.bsize) / (1024 * 1024) < config.minimumAvailableDiskMiB) {
