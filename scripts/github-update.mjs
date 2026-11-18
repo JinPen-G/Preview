@@ -1,7 +1,7 @@
-/** Rebuild public framework changes with one fixed, privately stored business package. */
+/** Build Preview from an approved framework commit and a validated private business package. */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { readBusinessPackage, applyBusinessPackage } from './business-package.mjs';
@@ -11,6 +11,76 @@ import { deployRelease, checkHealth } from './deploy.mjs';
 
 const execute = promisify(execFile);
 const shaPattern = /^[a-f\d]{40}$/;
+const repositoryPattern = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
+const mainRef = 'refs/heads/main';
+
+function privateGit(config) {
+  const { repository, deployKey, knownHosts, projectId } = config;
+  if (
+    typeof repository !== 'string' ||
+    !repositoryPattern.test(repository) ||
+    ![deployKey, knownHosts].every((filename) => typeof filename === 'string' && /^\/[\w./-]+$/.test(filename)) ||
+    typeof projectId !== 'string' ||
+    !projectId
+  )
+    throw new Error('Invalid private business Git configuration');
+  // Scope the repository credential to these Git calls and ignore machine-level SSH overrides.
+  const options = {
+    timeout: 120000,
+    env: {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_SSH_VARIANT: 'ssh',
+      GIT_SSH_COMMAND: `ssh -F /dev/null -i ${deployKey} -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${knownHosts} -o GlobalKnownHostsFile=/dev/null`,
+    },
+  };
+  const remote = `ssh://git@github.com/${repository}.git`;
+  return {
+    projectId,
+    async head() {
+      const { stdout } = await execute('git', ['ls-remote', '--exit-code', remote, mainRef], options);
+      const [commit, ref] = stdout.trim().split('\t');
+      if (!shaPattern.test(commit) || ref !== mainRef) throw new Error('Invalid private business main ref');
+      return commit;
+    },
+    async checkoutPackage(workspace, commit) {
+      const repository = path.join(workspace, 'business.git');
+      await execute('git', ['init', '--quiet', '--bare', repository], options);
+      await execute('git', ['fetch', '--quiet', '--depth=1', remote, mainRef], {
+        ...options,
+        cwd: repository,
+      });
+      const readGit = (args) => execute('git', args, { cwd: repository, timeout: options.timeout });
+      if ((await readGit(['rev-parse', 'FETCH_HEAD'])).stdout.trim() !== commit)
+        throw new Error('Private business main changed during fetch; defer to the next run');
+      const object = `${commit}:project.json`;
+      const { stdout: entry } = await readGit(['ls-tree', commit, '--', 'project.json']);
+      if (!/^100644 blob [a-f\d]{40}\tproject\.json\r?\n$/.test(entry))
+        throw new Error('Private business Git requires a regular project.json');
+      const size = await readGit(['cat-file', '-s', object]);
+      if (Number(size.stdout) > 192 * 1024 * 1024)
+        throw new Error('Private business Git requires a project.json within the package size limit');
+      const filename = path.join(workspace, 'project.json');
+      const output = await fs.open(filename, 'wx', 0o600);
+      try {
+        await new Promise((resolve, reject) => {
+          const child = spawn('git', ['cat-file', 'blob', object], {
+            cwd: repository,
+            stdio: ['ignore', output.fd, 'ignore'],
+            timeout: options.timeout,
+          });
+          child.once('error', reject);
+          child.once('close', (code) =>
+            code === 0 ? resolve() : reject(new Error('Unable to read the private business package')),
+          );
+        });
+      } finally {
+        await output.close();
+      }
+      return filename;
+    },
+  };
+}
 async function removeBuildWorkspace(workspace, workRoot) {
   if (path.dirname(await fs.realpath(workspace)) !== (await fs.realpath(workRoot)))
     throw new Error('Updater cleanup escaped its workspace');
@@ -40,7 +110,7 @@ export async function cleanupUpdateWorkspaces(workRoot) {
 }
 export async function approvedMain(config, request = fetch) {
   if (
-    !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(config.repository) ||
+    !repositoryPattern.test(config.repository) ||
     !/^[a-zA-Z0-9_.-]+\.ya?ml$/.test(config.workflow)
   )
     throw new Error('Invalid GitHub update source');
@@ -100,13 +170,25 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
     console.log('Deferring build until sufficient disk space is available.');
     return { status: 'waiting-for-disk' };
   }
-  const business = await readBusinessPackage(config.businessPackage);
+  const businessGit = config.businessGit ? privateGit(config.businessGit) : null;
+  const businessCommit = businessGit ? await businessGit.head() : null;
   const stateFile = path.join(deploy.stateRoot, 'auto-update.json');
   const state = await readJson(stateFile);
   const current = await readJson(path.join(deploy.releaseRoot, 'current.json'));
   if (
+    businessGit &&
     state?.commit === approved.commit &&
-    state.businessVersion === business.version &&
+    state.businessCommit === businessCommit &&
+    state.releaseId === current?.releaseId
+  ) {
+    console.log('Framework and private business Git are current.');
+    return { status: 'current', releaseId: current.releaseId };
+  }
+  const fixedBusiness = businessGit ? null : await readBusinessPackage(config.businessPackage);
+  if (
+    fixedBusiness &&
+    state?.commit === approved.commit &&
+    state.businessVersion === fixedBusiness.version &&
     state.releaseId === current?.releaseId
   ) {
     console.log('Framework and fixed business package are current.');
@@ -125,7 +207,6 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
     npm_config_cache: path.join(config.workRoot, 'npm-cache'),
   };
   const log = path.join(config.workRoot, 'last-build.log');
-  await fs.writeFile(log, `Commit ${approved.commit}\nBusiness ${business.version}\n`, { mode: 0o600 });
   const run = async (command, args, cwd = source) => {
     try {
       const result = await execute(command, args, {
@@ -152,9 +233,9 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
       throw new Error('An explicit server protection command is required');
     await run(config.guardCommand[0], config.guardCommand.slice(1), workspace);
   };
-  const pageCatalog = async () => {
+  const pageCatalog = async (projectId) => {
     const url = new URL('/api/native/showcase', deploy.healthUrl);
-    url.searchParams.set('projectId', business.registration.module.projectId);
+    url.searchParams.set('projectId', projectId);
     const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
     if (!response.ok) throw new Error('Business page catalog is unavailable');
     const result = await response.json();
@@ -164,9 +245,25 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
       .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   };
   try {
+    const business = fixedBusiness ?? (await readBusinessPackage(
+      await businessGit.checkoutPackage(workspace, businessCommit),
+    ));
+    const projectId = business.registration.module.projectId;
+    if (businessGit && projectId !== businessGit.projectId)
+      throw new Error('Private business package does not match the configured project');
+    await fs.writeFile(log, `Commit ${approved.commit}\nBusiness ${business.version}\n`, { mode: 0o600 });
+    if (
+      businessGit &&
+      state?.commit === approved.commit &&
+      state.businessVersion === business.version &&
+      state.releaseId === current?.releaseId
+    ) {
+      await writeJson(stateFile, { ...state, businessCommit });
+      return { status: 'current', releaseId: current.releaseId };
+    }
     await guard();
     console.log(
-      `Building approved framework ${approved.commit.slice(0, 12)} with fixed business ${business.version.slice(0, 12)}`,
+      `Building approved framework ${approved.commit.slice(0, 12)} with business ${business.version.slice(0, 12)}`,
     );
     await run('git', ['init', '--quiet', source], workspace);
     await run('git', [
@@ -204,13 +301,16 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
     });
     await verifyRelease(packaged.release);
     const again = await approvedMain(config, request);
+    const businessChanged = businessGit
+      ? (await businessGit.head()) !== businessCommit
+      : (await readBusinessPackage(config.businessPackage)).version !== business.version;
     if (
       again?.commit !== approved.commit ||
-      (await readBusinessPackage(config.businessPackage)).version !== business.version
+      businessChanged
     )
       throw new Error('Main or the business package changed during build; defer to the next run');
     await guard();
-    const beforePages = JSON.stringify(await pageCatalog());
+    const beforePages = JSON.stringify(await pageCatalog(projectId));
     const archive = path.join(workspace, 'application.tar.gz');
     await run('tar', ['-czf', archive, '-C', destination, packaged.manifest.releaseId]);
     const pointer = await readJson(path.join(deploy.releaseRoot, 'current.json'));
@@ -228,7 +328,7 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
           const releaseId = transaction?.candidateReady ? transaction.releaseId : active?.releaseId;
           const manifest = await verifyRelease(path.join(deploy.releaseRoot, releaseId));
           await checkHealth(deploy, manifest);
-          if (JSON.stringify(await pageCatalog()) !== beforePages)
+          if (JSON.stringify(await pageCatalog(projectId)) !== beforePages)
             throw new Error('Business pages or public permissions changed; reject candidate');
         }
       },
@@ -236,6 +336,7 @@ export async function updateFromGithub(config, { request = fetch } = {}) {
     const next = {
       commit: approved.commit,
       businessVersion: business.version,
+      ...(businessCommit ? { businessCommit } : {}),
       releaseId: packaged.manifest.releaseId,
       sequence,
       updatedAt: new Date().toISOString(),

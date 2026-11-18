@@ -3,6 +3,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { approvedMain, cleanupUpdateWorkspaces, updateFromGithub } from '../../scripts/github-update.mjs';
 import {
   packageBusiness,
@@ -221,6 +223,44 @@ async function resourceFixture(availableMiB) {
     minimumAvailableDiskMiB: 6144,
   };
 }
+test('first private Git poll associates the pinned business commit with the unchanged live package', async () => {
+  const options = await resourceFixture(4990);
+  const repository = path.join(path.dirname(options.deployConfig), 'private-git');
+  await fs.mkdir(repository);
+  const git = (...args) => execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
+  git('init', '--quiet', '--initial-branch=main');
+  await fs.copyFile(options.businessPackage, path.join(repository, 'project.json'));
+  git('add', '--', 'project.json');
+  git('-c', 'user.name=Preview Tests', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'package');
+  const businessCommit = git('rev-parse', 'HEAD');
+  const remote = 'ssh://git@github.com/fixture/private.git';
+  const previous = ['GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0'].map(
+    (name) => [name, process.env[name]],
+  );
+  try {
+    process.env.GIT_CONFIG_COUNT = '1';
+    process.env.GIT_CONFIG_KEY_0 = `url.${pathToFileURL(repository).href}.insteadOf`;
+    process.env.GIT_CONFIG_VALUE_0 = remote;
+    options.businessGit = {
+      repository: 'fixture/private',
+      projectId: 'fixture',
+      deployKey: '/example/key',
+      knownHosts: '/example/known_hosts',
+    };
+    await expect(updateFromGithub(options, { request: github(workflow()) })).resolves.toMatchObject({
+      status: 'current',
+    });
+    const state = JSON.parse(
+      await fs.readFile(path.join(path.dirname(options.deployConfig), 'install/state/auto-update.json'), 'utf8'),
+    );
+    expect(state.businessCommit).toBe(businessCommit);
+  } finally {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
 test('an already current release does not reserve the updater anonymous memory twice', async () => {
   const options = await resourceFixture(4990);
   expect(await updateFromGithub(options, { request: github(workflow()) })).toMatchObject({

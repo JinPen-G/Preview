@@ -24,7 +24,7 @@ npm run business:package -- --project your-project --output .preview-data/busine
 
 业务包按文件记录SHA-256，并由整体版本标识固定。将其保存在服务器的私有目录，由root维护、preview账号只读。只有主动发布业务内容时才替换此包。数据库、用户、菜单和授权继续由原持久化目录维护。
 
-服务器可选用preview-update.service和preview-update.timer，每次完成后间隔三小时检查GitHub的main分支。只有同一仓库、当前main提交的push工作流成功，才拉取固定提交并结合服务器业务包构建完整应用。框架的公开项目声明取自当前Git提交，业务声明追加到本地适配清单，不能覆盖框架已有文件。构建期间main或业务包改变时，等待下一轮重建。
+服务器可选用 `preview-update.service` 和 `preview-update.timer`，按北京时间每小时整点检查一次。只有框架仓库当前 `main` 提交的 push 工作流成功，才会使用该提交和选定的业务包构建完整应用。业务声明追加到本地适配清单。构建期间任一来源改变时，等待下一轮重建。
 
 更新器采用独立依赖与构建目录，复用本服务下载缓存，并在退出后清理一次性源码及依赖。systemd限制构建CPU和内存；磁盘或可用内存不足时推迟构建。主机保护命令由运维写入root维护的配置，在构建、部署前后核对共享服务。
 
@@ -51,6 +51,12 @@ npm run business:package -- --project your-project --output .preview-data/busine
 maximumBuildMemoryMiB必须与更新服务的MemoryMax一致。模板限制整个构建服务为3584MiB，Node堆为2816MiB，构建前至少需要4608MiB预算，其中保留1024MiB给宿主。旧配置未设置maximumBuildMemoryMiB时仍按4096MiB构建上限及5120MiB预算校验。资源不足时日志给出实际可用量和所需量，定时任务等待下一轮。
 
 启用此方式时，PREVIEW_DEPLOY_ENABLED保持未设置或false，GitHub仅生成公开框架发行并提供检查结果。服务器通过HTTPS拉取公开代码，私有业务包保存在服务器。该方式不依赖部署SSH私钥或GitHub Secrets。日志通过journalctl -u preview-update.service和私有构建目录last-build.log读取，框架/业务版本记录在/opt/preview/state/auto-update.json。
+
+### 从私有 Git 仓库发布业务包
+
+也可以在更新器配置中添加 `businessGit`，从另一个 GitHub 私有仓库的 `main` 读取根目录的 `project.json`。该对象使用上面的打包命令生成。为私有仓库添加只读 deploy key，并为服务器配置已核实的 GitHub 主机公钥。`businessGit` 包含 `repository`、`projectId`、`deployKey` 和 `knownHosts`。后两项使用服务器上的绝对路径。配置 `businessGit` 后，更新器以该仓库作为业务来源，记录实际发布的 `businessCommit` 和 `businessVersion`。
+
+首次推送私有业务包后，将该仓库检出到 `.preview-data/business-git/<project-id>`。日常在 Preview 中完成项目修改后执行 `npm run business:push -- <project-id>`。命令先验证目标仓库为私有，再生成并推送单独的业务包提交。每小时整点由服务器拉取两个仓库的版本。内容校验失败时继续使用线上发行。页面增删或公开范围变化会触发现有页面清单保护，需要单独核对后发布。
 
 ## 首次服务器准备
 
