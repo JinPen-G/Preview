@@ -92,7 +92,9 @@ function FullscreenSurface({
           if (
             nativeRef.current?.querySelector('[role="dialog"]') ||
             (target instanceof Element &&
-              target.closest('[role="menu"], [role="listbox"], [role="combobox"][aria-expanded="true"]'))
+              target.closest(
+                '[role="menu"], [role="listbox"], [role="combobox"][aria-expanded="true"], [data-preview-escape-layer]',
+              ))
           )
             event.preventDefault();
         }}

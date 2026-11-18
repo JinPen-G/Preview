@@ -236,6 +236,7 @@ const english: Record<string, string> = {
   同站上次更新: 'Round-trip updated',
   甲乙上次更新: 'One-way updated',
   权限演示: 'Permission preview',
+  库存演示: 'Inventory preview',
   分时租赁: 'Car sharing',
   动态调价策略: 'Rate management',
   门市标准价: 'Store rates',

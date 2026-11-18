@@ -31,31 +31,36 @@ body[data-preview-view='showcase'] #root {
 .preview-showcase *::after {
   box-sizing: border-box;
 }
-.preview-showcase :where(button, input, select, textarea) {
-  font: inherit;
+.preview-showcase :where(:not(.showcase-runtime-ready *, .showcase-screen-portals *)) {
+  &:where(button, input, select, textarea) {
+    font: inherit;
+  }
+  &:where(button) {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    cursor: pointer;
+  }
+  &:where(button:disabled) {
+    cursor: default;
+    opacity: 0.5;
+  }
+  &:where(a) {
+    color: inherit;
+  }
+  &:where(h1, h2, h3, p) {
+    margin-top: 0;
+  }
+  &:where(button, a, input, select):focus-visible {
+    outline: 2px solid var(--foreground);
+    outline-offset: 3px;
+  }
 }
-.preview-showcase :where(button) {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 0;
-}
-.preview-showcase :where(button) {
-  cursor: pointer;
-}
-.preview-showcase :where(button:disabled) {
-  cursor: default;
-  opacity: 0.5;
-}
-.preview-showcase :where(a) {
-  color: inherit;
-}
-.preview-showcase :where(h1, h2, h3, p) {
-  margin-top: 0;
-}
-.preview-showcase :where(button, a, input, select):focus-visible {
-  outline: 2px solid var(--foreground);
-  outline-offset: 3px;
+.preview-showcase :is(.showcase-runtime-ready, .showcase-screen-portals) {
+  --control-height-sm: var(--rental-control-height-small);
+  --control-height-md: var(--rental-control-height-default);
+  --control-height-lg: var(--rental-control-height-large);
 }
 .preview-showcase .showcase-site-full {
   max-width: 1472px;

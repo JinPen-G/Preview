@@ -5,7 +5,7 @@ import { FullscreenPreview } from './FullscreenPreview';
 import { useRef, useState } from 'react';
 
 afterEach(cleanup);
-function Fixture() {
+function Fixture({ disclosure = false }: { disclosure?: boolean }) {
   const [open, setOpen] = useState(false);
   const [nativeDialog, setNativeDialog] = useState(false);
   const [nativeMenu, setNativeMenu] = useState(false);
@@ -20,7 +20,8 @@ function Fixture() {
           <button onClick={() => setNativeMenu(true)}>Open native menu</button>
           {nativeMenu && (
             <div
-              role="menu"
+              role={disclosure ? 'group' : 'menu'}
+              data-preview-escape-layer={disclosure ? '' : undefined}
               aria-label="Native menu"
               onKeyDown={(event) => {
                 if (event.key === 'Escape') setNativeMenu(false);
@@ -107,16 +108,19 @@ it('keeps fullscreen open when a transferred native button opens and edits a nes
   expect(screen.getByRole('dialog', { name: 'Example' })).toBeInTheDocument();
 });
 
-it('lets Escape close a native action menu before leaving fullscreen', async () => {
-  render(<Fixture />);
-  fireEvent.click(screen.getByText('Open fullscreen'));
-  await screen.findByRole('dialog', { name: 'Example' });
-  fireEvent.click(screen.getByText('Open native menu'));
-  const action = await screen.findByRole('menuitem', { name: 'Native action' });
-  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
-  fireEvent.keyDown(action, { key: 'Escape' });
-  await waitFor(() => expect(screen.queryByRole('menu', { name: 'Native menu' })).not.toBeInTheDocument());
-  expect(screen.getByRole('dialog', { name: 'Example' })).toBeInTheDocument();
-  fireEvent.keyDown(screen.getByLabelText('Draft'), { key: 'Escape' });
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Example' })).not.toBeInTheDocument());
-});
+it.each([false, true])(
+  'lets Escape close a nested menu or disclosure before leaving fullscreen (%s)',
+  async (disclosure) => {
+    render(<Fixture disclosure={disclosure} />);
+    fireEvent.click(screen.getByText('Open fullscreen'));
+    await screen.findByRole('dialog', { name: 'Example' });
+    fireEvent.click(screen.getByText('Open native menu'));
+    const action = await screen.findByRole('menuitem', { name: 'Native action' });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    fireEvent.keyDown(action, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByText('Native action')).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: 'Example' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText('Draft'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Example' })).not.toBeInTheDocument());
+  },
+);

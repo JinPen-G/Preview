@@ -201,6 +201,7 @@ export function Detail({ page }: { page: CatalogPage }) {
   const setTab = (tab: 'preview' | 'document' | 'source') => setTabSelection({ route: route.key, tab });
   const [mobile, setMobile] = useState(false),
     [expanded, setExpanded] = useState(false);
+  const narrowViewport = useNarrowViewport();
   const nativePreview = useRef<HTMLDivElement | null>(null);
   const [fullscreenBounds, setFullscreenBounds] = useState<{
     top: number;
@@ -512,7 +513,7 @@ export function Detail({ page }: { page: CatalogPage }) {
                         <LoadingStage label="读取页面…" />
                       ) : detail ? (
                         isScreen ? (
-                          <ScreenWorkspace page={page} compact={mobile}>
+                          <ScreenWorkspace page={page} compact={mobile || (expanded && narrowViewport)}>
                             <div data-prototype-canvas={tab === 'preview' || undefined}>
                               <RuntimePage
                                 key={detail.contentRevision}
@@ -716,6 +717,13 @@ const subscribeMobileHeader = (notify: () => void) => {
   query.addEventListener('change', notify);
   return () => query.removeEventListener('change', notify);
 };
+function useNarrowViewport() {
+  return useSyncExternalStore(
+    subscribeMobileHeader,
+    () => window.matchMedia('(max-width: 760px)').matches,
+    () => false,
+  );
+}
 
 function Site() {
   const navigate = useNavigate();
@@ -859,11 +867,7 @@ function Site() {
   const graphPageProject = projectCatalog.data?.projects.find((project) => project.id === graphProjectId);
   const isDocs = location.pathname.startsWith('/docs') && !isGraph;
   const home = location.pathname === '/';
-  const mobileHeader = useSyncExternalStore(
-    subscribeMobileHeader,
-    () => window.matchMedia('(max-width: 760px)').matches,
-    () => false,
-  );
+  const mobileHeader = useNarrowViewport();
   // Move utilities into mobile navigation so the brand can stay at the screen center.
   const compactHomeHeader = home && mobileHeader;
   const demoDestination = `/demo${displayedProject ? `?project=${encodeURIComponent(displayedProject)}` : ''}`;
