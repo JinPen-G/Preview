@@ -39,6 +39,7 @@ export function graphDemandRendering(
   pause: () => void,
   frame: (callback: (time: number) => void) => number = requestAnimationFrame,
   cancel: (id: number) => void = cancelAnimationFrame,
+  keepRendering: () => boolean = () => false,
 ) {
   let pending = 0;
   let disposed = false;
@@ -47,7 +48,8 @@ export function graphDemandRendering(
   const settle = () => {
     if (disposed) return;
     afterFrame();
-    if (--remaining > 0) pending = frame(settle);
+    remaining = Math.max(0, remaining - 1);
+    if (remaining > 0 || keepRendering()) pending = frame(settle);
     else {
       pending = 0;
       pause();

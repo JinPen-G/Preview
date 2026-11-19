@@ -97,7 +97,7 @@ it('finds original requirement names even when interface labels use another lang
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  await screen.findByText('彩色点 2D');
+  await screen.findByText('固定球形 3D');
   fireEvent.change(screen.getByRole('textbox', { name: '搜索需求点' }), { target: { value: '车辆预约' } });
   expect(
     within(screen.getByRole('complementary', { name: '查找需求点' })).getByRole('button', {
@@ -112,7 +112,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   HTMLElement.prototype.scrollTo = originalScrollTo;
 });
-it('starts with the full colored 2D graph and uses legends rather than category gates', async () => {
+it('defaults to 3D and places the interactive legends after the graph', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   clients.push(client);
   render(
@@ -122,7 +122,10 @@ it('starts with the full colored 2D graph and uses legends rather than category 
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  expect(await screen.findByText('彩色点 2D')).toBeInTheDocument();
+  const globe = await screen.findByText('固定球形 3D');
+  expect(screen.getByRole('tab', { name: '3D' })).toHaveAttribute('aria-selected', 'true');
+  const legend = screen.getByRole('group', { name: '节点图例' });
+  expect(globe.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.queryByText('按业务查找需求')).not.toBeInTheDocument();
   const initialNodes = state.views.at(-1)!.nodes;
   fireEvent.click(
@@ -131,8 +134,6 @@ it('starts with the full colored 2D graph and uses legends rather than category 
     }),
   );
   expect(await screen.findByRole('complementary', { name: '节点详情' })).toHaveTextContent('车辆预约');
-  fireEvent.click(screen.getByRole('tab', { name: '3D' }));
-  expect(await screen.findByText('固定球形 3D')).toBeInTheDocument();
   expect(state.views.at(-1)!.selected).toBe('feature');
   expect(state.views.at(-1)!.nodes).toBe(initialNodes);
   fireEvent.click(
@@ -164,7 +165,7 @@ it('places the guide below the graph and keeps the finder, selection and view wh
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  await screen.findByText('彩色点 2D');
+  await screen.findByText('固定球形 3D');
   const preview = screen.getByRole('region', { name: '图谱预览' });
   const guide = screen.getByRole('heading', { name: '从原文理解关系' });
   expect(preview.compareDocumentPosition(guide) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -185,14 +186,14 @@ it('places the guide below the graph and keeps the finder, selection and view wh
   expect(within(dialog).getByRole('textbox', { name: '搜索需求点' })).toBe(finder);
   expect(dialog).toContainElement(frame as HTMLElement);
   expect(within(dialog).getByRole('complementary', { name: '节点详情' })).toHaveTextContent('车辆预约');
-  fireEvent.click(within(dialog).getByRole('tab', { name: '3D' }));
-  await within(dialog).findByText('固定球形 3D');
+  fireEvent.click(within(dialog).getByRole('tab', { name: '2D' }));
+  await within(dialog).findByText('彩色点 2D');
   expect(state.views.at(-1)?.selected).toBe('feature');
   fireEvent.click(within(dialog).getByRole('button', { name: '关闭放大预览' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(within(preview).getByRole('textbox', { name: '搜索需求点' })).toBe(finder);
   expect(finder).toHaveValue('车辆预约');
-  expect(within(preview).getByRole('tab', { name: '3D' })).toHaveAttribute('aria-selected', 'true');
+  expect(within(preview).getByRole('tab', { name: '2D' })).toHaveAttribute('aria-selected', 'true');
   expect(rendered.container.querySelector('.requirement-graph-frame')).toBe(frame);
 });
 
@@ -206,7 +207,7 @@ it('provides an empty detail panel in fullscreen before a node is selected', asy
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  await screen.findByText('彩色点 2D');
+  await screen.findByText('固定球形 3D');
   fireEvent.click(screen.getByRole('button', { name: '放大预览' }));
   const dialog = await screen.findByRole('dialog', { name: '需求关系图谱' });
   expect(within(dialog).getByRole('complementary', { name: '查找需求点' })).toBeInTheDocument();

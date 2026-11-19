@@ -49,6 +49,7 @@ export default function RequirementGraphSphere(props: GraphViewProps) {
     const controls = graph.controls() as OrbitControls;
     controls.enableDamping = false;
     controls.autoRotate = false;
+    controls.autoRotateSpeed = 0.65;
     controls.enablePan = false;
     controls.rotateSpeed = 0.65;
     controls.minDistance = 280;
@@ -77,6 +78,9 @@ export default function RequirementGraphSphere(props: GraphViewProps) {
     let visible = graphVisibility([], [], [], []);
     let emphasizing = graphEmphasis([], [], null, null, visible);
     let currentLabels: SphereNode[] = [];
+    let inViewport = false;
+    let contextLost = false;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const vector = new Vector3();
     const direction = new Vector3();
     const placeLabels = () => {
@@ -99,11 +103,22 @@ export default function RequirementGraphSphere(props: GraphViewProps) {
     const demand = graphDemandRendering(
       () => graph.resumeAnimation(),
       () => graph.pauseAnimation(),
+      requestAnimationFrame,
+      cancelAnimationFrame,
+      () => controls.autoRotate,
     );
     const wake = () => {
-      if (!disposed && !document.hidden) demand.wake(placeLabels);
+      if (disposed || contextLost || document.hidden) return;
+      controls.autoRotate =
+        initialized &&
+        inViewport &&
+        !reducedMotion.matches &&
+        !current.current.selected &&
+        drawing.nodes.length > 1;
+      demand.wake(placeLabels);
     };
     const remember = () => {
+      if (controls.autoRotate) return;
       memory.camera = { ...graph.cameraPosition() };
       memory.target = { x: controls.target.x, y: controls.target.y, z: controls.target.z };
       wake();
@@ -286,14 +301,24 @@ export default function RequirementGraphSphere(props: GraphViewProps) {
     const site = element.closest('.preview-showcase');
     if (site) theme.observe(site, { attributes: true, attributeFilter: ['data-theme', 'style'] });
     const visibility = () => {
-      if (document.hidden) demand.stop();
-      else wake();
+      if (document.hidden) {
+        controls.autoRotate = false;
+        demand.stop();
+      } else wake();
     };
     const lost = (event: Event) => {
       event.preventDefault();
+      contextLost = true;
+      controls.autoRotate = false;
       demand.stop();
       setError(current.current.text('3D 画布已暂停，请切换到 2D 或重新打开 3D。'));
     };
+    const viewport = new IntersectionObserver(([entry]) => {
+      inViewport = entry.isIntersecting;
+      wake();
+    });
+    viewport.observe(element);
+    reducedMotion.addEventListener('change', wake);
     renderer.domElement.addEventListener('webglcontextlost', lost);
     for (const name of ['pointerdown', 'pointermove', 'pointerup', 'wheel', 'pointerleave'])
       element.addEventListener(name, wake, { passive: true });
@@ -334,6 +359,8 @@ export default function RequirementGraphSphere(props: GraphViewProps) {
       cancelAnimationFrame(initializeFrame);
       resize.disconnect();
       theme.disconnect();
+      viewport.disconnect();
+      reducedMotion.removeEventListener('change', wake);
       document.removeEventListener('visibilitychange', visibility);
       controls.removeEventListener('change', remember);
       renderer.domElement.removeEventListener('webglcontextlost', lost);

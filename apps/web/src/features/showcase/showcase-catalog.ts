@@ -22,6 +22,7 @@ export interface CatalogPage {
 export interface ShowcaseProject {
   id: string;
   name: string;
+  hasGraph?: boolean;
 }
 export function useShowcaseProject(
   requested: string | null | undefined,

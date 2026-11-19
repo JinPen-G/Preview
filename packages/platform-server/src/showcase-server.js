@@ -13,7 +13,7 @@ import {
 import { readContentFile } from '../../project-core/src/platform/project-content.js';
 import { fail } from '../../project-core/src/platform/store.js';
 import { requireScope, requireProjectComponent } from '../../project-core/src/platform/agent-context.js';
-import { resolveExistingPathInsideRoot } from '../../project-core/src/filesystem.js';
+import { mapWithConcurrency, resolveExistingPathInsideRoot } from '../../project-core/src/filesystem.js';
 import {
   pageDocuments,
   requireDocumentAccess,
@@ -160,9 +160,24 @@ export function createShowcaseHandler({
     if (request.method !== 'GET') fail(405, '展示资料仅支持读取', 'METHOD_NOT_ALLOWED');
     if (url.pathname === '/api/native/showcase/projects') {
       const projects = new Map();
-      for (const page of store.pageCatalog(user))
-        projects.set(page.projectId, { id: page.projectId, name: page.projectName });
-      json(response, { projects: [...projects.values()] });
+      for (const page of store.pageCatalog(user)) {
+        if (!projects.has(page.projectId)) projects.set(page.projectId, page);
+      }
+      const entries = await mapWithConcurrency([...projects.values()], 8, async (page) => {
+        const { projectId: id, projectName: name, clientId, pageKey } = page;
+        const { project } = store.pageAccess(user, id, clientId, pageKey);
+        const hasGraph = await content.hasGraph(project).catch(() => undefined);
+        const currentUser = store.authenticate(cookies(request))?.user ?? null;
+        try {
+          const current = store.pageAccess(currentUser, id, clientId, pageKey).project;
+          if (current.revision === project.revision) return { id, name, hasGraph };
+          return { id, name: current.name };
+        } catch (error) {
+          if (![401, 403, 404].includes(error.status)) throw error;
+          return null;
+        }
+      });
+      json(response, { projects: entries.filter(Boolean) });
       return true;
     }
     if (url.pathname === '/api/native/showcase') {

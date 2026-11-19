@@ -336,7 +336,33 @@ test('web filters nodes, edges and no-prototype PRDs; authorized MCP reads busin
       password: 'fixture-password',
     });
   store.createProject(admin, project);
+  store.createProject(admin, {
+    ...project,
+    id: 'without-graph',
+    name: 'No graph',
+    sourceId: 'none',
+    contentKey: undefined,
+  });
+  store.createProject(admin, {
+    ...project,
+    id: 'private-graph',
+    name: 'Restricted graph',
+    clients: project.clients.map((client) => ({
+      ...client,
+      pages: client.pages.map((page) => ({ ...page, access: 'restricted' })),
+    })),
+  });
   const base = `http://127.0.0.1:${item.runtime.server.address().port}`;
+  const catalog = await fetch(`${base}/api/native/showcase/projects`);
+  expect(catalog.status).toBe(200);
+  const { projects } = await catalog.json();
+  expect(projects).toHaveLength(2);
+  expect(projects).toEqual(
+    expect.arrayContaining([
+      { id: 'graph-project', name: 'Graph fixture', hasGraph: true },
+      { id: 'without-graph', name: 'No graph', hasGraph: false },
+    ]),
+  );
   const response = await fetch(`${base}/api/native/showcase/graph-project/graph?limit=500`);
   expect(response.status).toBe(200);
   const web = await response.json();

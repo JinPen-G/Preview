@@ -180,7 +180,7 @@ async function regularFiles(root, relative = '', depth = 0) {
   }
   return files.sort();
 }
-export async function loadContentPackage(root, contentKey, moduleCatalog) {
+async function readContentManifest(root, contentKey, moduleCatalog) {
   requireValue(validId(contentKey), '业务资料包标识无效');
   const rootStat = await fs.lstat(root).catch(() => null);
   if (!rootStat?.isDirectory() || rootStat.isSymbolicLink())
@@ -199,6 +199,10 @@ export async function loadContentPackage(root, contentKey, moduleCatalog) {
   }
   const manifest = validateContentManifest(input, moduleCatalog);
   requireValue(manifest.contentKey === contentKey);
+  return { directory, manifest };
+}
+export async function loadContentPackage(root, contentKey, moduleCatalog) {
+  const { directory, manifest } = await readContentManifest(root, contentKey, moduleCatalog);
   const names = [
     manifest.overview,
     ...manifest.requirements.map((item) => item.path),
@@ -469,6 +473,13 @@ export function createProjectContent({
     };
   }
   return {
+    async hasGraph(project) {
+      if (!project.contentKey) return false;
+      const { root, contents } = await location();
+      if (contents && !contents.some((entry) => entry.contentKey === project.contentKey)) return false;
+      const { manifest } = await readContentManifest(root, project.contentKey, moduleCatalog);
+      return manifest.moduleKey === project.moduleKey && Boolean(manifest.graph);
+    },
     async catalog() {
       const { root, contents } = await location();
       return (await loadContentCatalog(root, moduleCatalog)).map(({ manifest, revision }) => {

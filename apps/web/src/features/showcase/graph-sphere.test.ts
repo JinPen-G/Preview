@@ -59,6 +59,7 @@ describe('fixed graph views', () => {
     const resume = vi.fn();
     const pause = vi.fn();
     const render = vi.fn();
+    let rotating = false;
     const scheduling = graphDemandRendering(
       resume,
       pause,
@@ -69,6 +70,7 @@ describe('fixed graph views', () => {
       (id) => {
         frames.delete(id);
       },
+      () => rotating,
     );
     const tick = () => {
       const callbacks = [...frames.values()];
@@ -83,11 +85,19 @@ describe('fixed graph views', () => {
     tick();
     expect(pause).toHaveBeenCalledTimes(1);
     expect(frames.size).toBe(0);
+    rotating = true;
     scheduling.wake();
     expect(resume).toHaveBeenCalledTimes(2);
+    for (let frame = 0; frame < 5; frame++) tick();
+    expect(frames.size).toBe(1);
+    rotating = false;
+    tick();
+    expect(pause).toHaveBeenCalledTimes(2);
+    expect(frames.size).toBe(0);
+    scheduling.wake();
     scheduling.dispose();
     expect(frames.size).toBe(0);
     scheduling.wake();
-    expect(resume).toHaveBeenCalledTimes(2);
+    expect(resume).toHaveBeenCalledTimes(3);
   });
 });

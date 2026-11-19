@@ -54,7 +54,7 @@
 }
 .requirement-graph-legend {
   flex: none;
-  margin-bottom: 12px;
+  margin-top: 12px;
   font-size: 12px;
 }
 .requirement-graph-legend summary {

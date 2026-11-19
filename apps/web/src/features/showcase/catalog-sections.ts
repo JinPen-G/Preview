@@ -7,6 +7,12 @@ export const catalogSections = [
 ] as const;
 
 export type CatalogKind = (typeof catalogSections)[number]['kind'];
+export type CatalogJumpKind = CatalogKind | 'graph';
+export const graphSection = { kind: 'graph', title: '知识图谱' } as const;
+
+export function projectGraphPath(projectId: string) {
+  return `/docs/graph?project=${encodeURIComponent(projectId)}`;
+}
 
 export function catalogKind(page: Pick<CatalogPage, 'kind'>): CatalogKind {
   return page.kind ?? 'page';

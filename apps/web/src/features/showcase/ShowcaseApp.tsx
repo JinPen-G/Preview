@@ -66,8 +66,10 @@ import {
   catalogKind,
   catalogPageTitle,
   catalogSections,
+  graphSection,
+  projectGraphPath,
   sectionForPath,
-  type CatalogKind,
+  type CatalogJumpKind,
 } from './catalog-sections';
 import { ProjectScreens } from './ProjectScreens';
 import { desktopScreen, mobileScreen } from './screen-preview';
@@ -851,15 +853,31 @@ function Site() {
   const selected = pages.find((page) => pageLink(page) === location.pathname);
   const section = sectionForPath(location.pathname);
   const selectedKind = selected ? catalogKind(selected) : (section?.kind ?? 'page');
+  const isGraph = projectDocs?.[2] === 'graph' || location.pathname === '/docs/graph';
+  const graphProjectId = projectDocs?.[1] ?? displayedProject;
+  const graphMenuKey = projectGraphPath(graphProjectId);
+  const sidebarActiveKey = isGraph ? graphMenuKey : location.pathname;
+  const graphPageProject = projectCatalog.data?.projects.find((project) => project.id === graphProjectId);
+  const sidebarSearchTerm = filter.trim().toLowerCase();
+  const graphProjects = (projectCatalog.data?.projects ?? []).filter(
+    (project) =>
+      project.hasGraph &&
+      `${project.name} 知识图谱 需求图谱 关系图谱 ${text('知识图谱')} ${text('关系图谱')}`
+        .toLowerCase()
+        .includes(sidebarSearchTerm) &&
+      (tier === 'all' || pages.some((page) => page.projectId === project.id && page.access === tier)),
+  );
+  const navigationRoute = isGraph ? graphMenuKey : location.pathname;
   const [catalogJump, setCatalogJump] = useState<{
-    kind: CatalogKind;
+    kind: CatalogJumpKind;
     route: string;
     revision: number;
   } | null>(null);
-  const jumpKind = catalogJump?.route === location.pathname ? catalogJump.kind : selectedKind;
-  const jumpToCatalog = (kind: CatalogKind, panel: HTMLElement | null) => {
+  const activeJump = catalogJump?.route === navigationRoute ? catalogJump : null;
+  const jumpKind = activeJump?.kind ?? (isGraph ? graphSection.kind : selectedKind);
+  const jumpToCatalog = (kind: CatalogJumpKind, panel: HTMLElement | null) => {
     flushSync(() =>
-      setCatalogJump({ kind, route: location.pathname, revision: (catalogJump?.revision ?? 0) + 1 }),
+      setCatalogJump({ kind, route: navigationRoute, revision: (catalogJump?.revision ?? 0) + 1 }),
     );
     const target = panel?.querySelector<HTMLElement>(`[data-catalog-section="${kind}"]`);
     const scroller = panel?.querySelector<HTMLElement>('.library-sidebar_scroll__Tdgfx');
@@ -873,17 +891,12 @@ function Site() {
     (page) =>
       `${page.title} ${catalogPageTitle(page)} ${text(catalogPageTitle(page))} ${page.projectName} ${page.category} ${text(page.category)}`
         .toLowerCase()
-        .includes(filter.trim().toLowerCase()) &&
+        .includes(sidebarSearchTerm) &&
       (tier === 'all' || page.access === tier) &&
       (!accessibleOnly || page.allowed),
   );
   const sectionPages = section ? pages.filter((page) => catalogKind(page) === section.kind) : pages;
   const first = sectionPages.find((page) => page.projectId === displayedProject) ?? sectionPages[0];
-  const isGraph = projectDocs?.[2] === 'graph' || location.pathname === '/docs/graph';
-  const graphProjectId = projectDocs?.[1] ?? displayedProject;
-  const graphMenuKey = `/docs/graph?project=${encodeURIComponent(graphProjectId)}`;
-  const sidebarActiveKey = isGraph ? graphMenuKey : location.pathname;
-  const graphPageProject = projectCatalog.data?.projects.find((project) => project.id === graphProjectId);
   const isDocs = location.pathname.startsWith('/docs') && !isGraph;
   const home = location.pathname === '/';
   const mobileHeader = useNarrowViewport();
@@ -922,7 +935,7 @@ function Site() {
           <Link
             key={item.kind}
             to={item.path}
-            aria-current={!home && !isDocs && selectedKind === item.kind ? 'page' : undefined}
+            aria-current={!home && !isDocs && !isGraph && selectedKind === item.kind ? 'page' : undefined}
           >
             {item.title}
           </Link>
@@ -1002,7 +1015,12 @@ function Site() {
         accessible={accessibleOnly}
         onAccessible={setAccessibleOnly}
       />
-      <CatalogJump pages={visible} current={jumpKind} onJump={jumpToCatalog} />
+      <CatalogJump
+        pages={visible}
+        graphCount={graphProjects.length}
+        current={jumpKind}
+        onJump={jumpToCatalog}
+      />
       <SidebarSelection activeKey={sidebarActiveKey}>
         <SidebarSection title="文档" icon={<BookOpen size={15} strokeWidth={1.75} />}>
           <nav className="library-sidebar_sectionBody__qECt_">
@@ -1024,28 +1042,56 @@ function Site() {
             </div>
           </nav>
         </SidebarSection>
-        {catalogSections.map(({ kind, title }) => {
+        {[...catalogSections.slice(0, 2), graphSection, catalogSections[2]].map(({ kind, title }) => {
           const Icon = catalogIcons[kind];
-          const items = visible.filter((page) => catalogKind(page) === kind);
-          const showGraphLink =
-            kind === 'page' &&
-            pages.some(
-              (page) =>
-                catalogKind(page) === 'page' &&
-                page.allowed &&
-                `${page.projectName} 关系图谱 知识图谱 需求图谱 ${text('关系图谱')} ${text('需求关系图谱')}`
-                  .toLowerCase()
-                  .includes(filter.trim().toLowerCase()),
+          if (kind === 'graph') {
+            return (
+              <div key={kind} data-catalog-section={kind}>
+                <SidebarSection
+                  title={title}
+                  count={graphProjects.length}
+                  icon={<Icon size={15} strokeWidth={1.75} aria-hidden="true" />}
+                  activeKey={
+                    activeJump?.kind === kind ? `jump:${activeJump.revision}` : isGraph ? graphMenuKey : ''
+                  }
+                  forceOpen={Boolean(sidebarSearchTerm) && graphProjects.length > 0}
+                >
+                  <nav className="library-sidebar_sectionBody__qECt_" aria-label={text(title)}>
+                    <div className="library-sidebar_rows__muylU">
+                      {graphProjects.map((project) => {
+                        const path = projectGraphPath(project.id);
+                        return (
+                          <Link
+                            key={project.id}
+                            to={path}
+                            data-sidebar-key={path}
+                            className="library-sidebar_row__aE5SY"
+                            aria-current={isGraph && graphProjectId === project.id ? 'page' : undefined}
+                            onClick={() => setMobileOpen(false)}
+                          >
+                            <span className="library-sidebar_label__EP9jR">{project.name}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                    {!graphProjects.length && (
+                      <p className="showcase-catalog-empty">
+                        {sidebarSearchTerm || tier !== 'all' ? '没有匹配内容' : '暂无知识图谱'}
+                      </p>
+                    )}
+                  </nav>
+                </SidebarSection>
+              </div>
             );
+          }
+          const items = visible.filter((page) => catalogKind(page) === kind);
           const groups = [...new Set(items.map((page) => page.category || page.clientName))];
           const activeKey =
-            kind === 'page' && isGraph
-              ? graphMenuKey
-              : catalogJump?.route === location.pathname && catalogJump.kind === kind
-                ? `jump:${catalogJump.revision}`
-                : selected && catalogKind(selected) === kind
-                  ? pageLink(selected)
-                  : '';
+            activeJump?.kind === kind
+              ? `jump:${activeJump.revision}`
+              : selected && catalogKind(selected) === kind
+                ? pageLink(selected)
+                : '';
           return (
             <div key={kind} data-catalog-section={kind}>
               <SidebarSection
@@ -1054,7 +1100,7 @@ function Site() {
                 icon={<Icon size={15} strokeWidth={1.75} aria-hidden="true" />}
                 activeKey={activeKey}
                 defaultOpen={kind === 'page'}
-                forceOpen={Boolean(filter) && (items.length > 0 || Boolean(showGraphLink))}
+                forceOpen={Boolean(sidebarSearchTerm) && items.length > 0}
               >
                 <nav className="library-sidebar_sectionBody__qECt_" aria-label={title}>
                   {kind === 'page' ? (
@@ -1107,7 +1153,7 @@ function Site() {
                       );
                     })
                   )}
-                  {!items.length && !showGraphLink && (
+                  {!items.length && (
                     <p className="showcase-catalog-empty">
                       {filter || tier !== 'all' ? '没有匹配内容' : `暂无${title}`}
                     </p>
@@ -1317,8 +1363,8 @@ function Site() {
                 <RequirementGraphPage
                   key={graphProjectId}
                   projectId={graphProjectId}
-                  title="关系图谱"
                   projectName={graphPageProject?.name}
+                  title="关系图谱"
                 />
               ) : projectDocs ? (
                 <SiteDocumentation

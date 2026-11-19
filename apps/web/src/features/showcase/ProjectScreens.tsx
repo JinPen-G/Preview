@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import type { CatalogPage, ShowcaseProject } from './showcase-catalog';
 import { catalogKind, catalogPageQualifier, catalogPageTitle } from './catalog-sections';
 import { SidebarSection } from './SidebarSection';
-import { LocalizedView, useShowcaseText } from './showcase-locale';
+import { LocalizedView } from './showcase-locale';
 import { orderedScreenPages } from './screen-navigation';
 
 export function ProjectScreens({
@@ -22,22 +22,15 @@ export function ProjectScreens({
   filter: string;
   onVisit: () => void;
 }) {
-  const text = useShowcaseText();
   const screens = pages.filter((page) => catalogKind(page) === 'page');
   return projects.map((project) => {
     const projectPages = screens.filter((page) => page.projectId === project.id);
     if (!projectPages.length) return null;
     const rows = orderedScreenPages(visible.filter((page) => page.projectId === project.id));
-    const graphPath = `/docs/graph?project=${encodeURIComponent(project.id)}`;
-    const showGraph =
-      projectPages.some((page) => page.allowed) &&
-      `${project.name} 关系图谱 知识图谱 需求图谱 ${text('关系图谱')} ${text('需求关系图谱')}`
-        .toLowerCase()
-        .includes(filter.trim().toLowerCase());
-    if (!rows.length && !showGraph) return null;
-    const active =
-      activeKey === graphPath ||
-      rows.some((page) => activeKey === `/pages/${page.projectId}/${page.clientId}/${page.pageKey}`);
+    if (!rows.length) return null;
+    const active = rows.some(
+      (page) => activeKey === `/pages/${page.projectId}/${page.clientId}/${page.pageKey}`,
+    );
     return (
       <LocalizedView key={project.id}>
         <div data-screen-project={project.id}>
@@ -50,18 +43,6 @@ export function ProjectScreens({
             forceOpen={Boolean(filter)}
           >
             <div className="library-sidebar_rows__muylU">
-              {showGraph && (
-                <Link
-                  className="library-sidebar_row__aE5SY showcase-project-graph"
-                  to={graphPath}
-                  data-sidebar-key={graphPath}
-                  aria-current={activeKey === graphPath ? 'page' : undefined}
-                  onClick={onVisit}
-                >
-                  <span className="library-sidebar_label__EP9jR">关系图谱</span>
-                </Link>
-              )}
-              {showGraph && rows.length > 0 && <hr className="showcase-project-divider" />}
               {rows.map((page) => {
                 const path = `/pages/${page.projectId}/${page.clientId}/${page.pageKey}`;
                 const qualifier = catalogPageQualifier(page, projectPages);

@@ -118,9 +118,9 @@ vi.mock('./showcase-catalog', async (importOriginal) => {
     useShowcaseProjects: () => ({
       data: {
         projects: [
-          { id: 'rental', name: 'RIMO Rental' },
-          { id: 'components', name: '组件中心' },
-          { id: 'store', name: '门市项目' },
+          { id: 'rental', name: 'RIMO Rental', hasGraph: true },
+          { id: 'components', name: '组件中心', hasGraph: false },
+          { id: 'store', name: '门市项目', hasGraph: true },
         ],
       },
     }),
@@ -165,7 +165,7 @@ afterEach(() => {
 });
 
 describe('showcase catalog navigation', () => {
-  it('groups Screens by project with a graph first, plain page titles and page-only counts', async () => {
+  it('groups Screens by project with plain page titles and page-only counts', async () => {
     mount('/docs');
     const sidebar = screen.getByRole('complementary', { name: '项目页面导航' });
     expect(within(sidebar).queryByRole('button', { name: '切换项目' })).not.toBeInTheDocument();
@@ -196,9 +196,7 @@ describe('showcase catalog navigation', () => {
     );
     expect(within(sidebar).getByRole('link', { name: '介绍' })).toHaveAttribute('href', '/docs');
     const rental = pages.querySelector('[data-screen-project="rental"]') as HTMLElement;
-    const graphLink = within(rental).getByRole('link', { name: '关系图谱' });
-    expect(graphLink).toHaveAttribute('href', '/docs/graph?project=rental');
-    expect(rental.querySelector('a')).toBe(graphLink);
+    expect(pages.querySelector('a[href^="/docs/graph"]')).toBeNull();
     expect(within(rental).getByRole('link', { name: '部门管理 营运' })).toHaveAttribute(
       'href',
       '/pages/rental/operation/departments',
@@ -210,11 +208,6 @@ describe('showcase catalog navigation', () => {
     expect(within(rental).queryByText('营运端 · 部门管理')).not.toBeInTheDocument();
     fireEvent.click(within(pages).getByRole('button', { name: '门市项目1' }));
     const store = pages.querySelector('[data-screen-project="store"]') as HTMLElement;
-    expect(within(store).getByRole('link', { name: '关系图谱' })).toHaveAttribute(
-      'href',
-      '/docs/graph?project=store',
-    );
-    expect(store.querySelector('a')).toHaveTextContent('关系图谱');
     expect(within(store).getByRole('link', { name: '订单管理' })).toHaveAttribute(
       'href',
       '/pages/store/web/orders',
@@ -236,6 +229,20 @@ describe('showcase catalog navigation', () => {
     expect(within(jump).getByRole('button', { name: '组件 · 1' })).toHaveAttribute('aria-pressed', 'true');
     expect(scrollTo).toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: '文档介绍' })).toBeInTheDocument();
+    fireEvent.click(within(jump).getByRole('button', { name: '知识图谱 · 2' }));
+    const graphs = await screen.findByRole('navigation', { name: '知识图谱' });
+    expect(within(graphs).getByRole('link', { name: 'RIMO Rental' })).toHaveAttribute(
+      'href',
+      '/docs/graph?project=rental',
+    );
+    expect(within(graphs).queryByRole('link', { name: '组件中心' })).not.toBeInTheDocument();
+    expect(within(jump).getAllByRole('button')).toHaveLength(4);
+    expect(within(jump).getByRole('button', { name: '知识图谱 · 2' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('heading', { name: '文档介绍' })).toBeInTheDocument();
   });
   it('preserves old project graph links while platform Docs remain global', async () => {
     mount('/docs/graph?project=rental');
@@ -243,20 +250,21 @@ describe('showcase catalog navigation', () => {
     expect(graphCatalog).toHaveBeenLastCalledWith(expect.any(Function), 'rental', expect.any(AbortSignal));
     expect(
       within(screen.getByRole('navigation', { name: '主导航' })).getByRole('link', { name: 'Screens' }),
-    ).toHaveAttribute('aria-current', 'page');
+    ).not.toHaveAttribute('aria-current');
     const sidebar = screen.getByRole('complementary', { name: '项目页面导航' });
     fireEvent.click(within(sidebar).getByRole('link', { name: '介绍' }));
     expect(await screen.findByRole('heading', { name: '文档介绍' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: '项目页面导航' })).toBe(sidebar);
   });
-  it('opens the live graph from a bare graph URL and the first Screens item', async () => {
+  it('opens the live graph from a bare graph URL and the knowledge graph section', async () => {
     mount('/docs/graph');
     expect(await screen.findByRole('textbox', { name: '搜索需求点' })).toBeInTheDocument();
     expect(graphCatalog).toHaveBeenLastCalledWith(expect.any(Function), 'rental', expect.any(AbortSignal));
     const sidebar = screen.getByRole('complementary', { name: '项目页面导航' });
     fireEvent.click(within(sidebar).getByRole('link', { name: '介绍' }));
     expect(await screen.findByRole('heading', { name: '文档介绍' })).toBeInTheDocument();
-    fireEvent.click(within(sidebar).getByRole('link', { name: '关系图谱' }));
+    const graphs = within(sidebar).getByRole('navigation', { name: '知识图谱' });
+    fireEvent.click(within(graphs).getByRole('link', { name: 'RIMO Rental' }));
     expect(await screen.findByRole('textbox', { name: '搜索需求点' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: '项目页面导航' })).toBe(sidebar);
   });
@@ -265,15 +273,19 @@ describe('showcase catalog navigation', () => {
     expect(await screen.findByRole('textbox', { name: '搜索需求点' })).toBeInTheDocument();
     expect(graphCatalog).toHaveBeenLastCalledWith(expect.any(Function), 'store', expect.any(AbortSignal));
     const sidebar = screen.getByRole('complementary', { name: '项目页面导航' });
-    const store = sidebar.querySelector('[data-screen-project="store"]') as HTMLElement;
-    expect(within(store).getByRole('link', { name: '关系图谱' })).toHaveAttribute('aria-current', 'page');
+    const graphs = within(sidebar).getByRole('navigation', { name: '知识图谱' });
+    expect(within(graphs).getByRole('link', { name: '门市项目' })).toHaveAttribute('aria-current', 'page');
+    expect(within(sidebar).getByRole('button', { name: '知识图谱 · 2' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     expect(within(sidebar).getByRole('button', { name: 'RIMO Rental3' })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
-    const breadcrumb = within(screen.getByRole('main')).getByRole('navigation', { name: 'Screens' });
-    expect(breadcrumb).toHaveTextContent('Screens门市项目关系图谱');
-    expect(breadcrumb.querySelectorAll('svg')).toHaveLength(2);
+    const breadcrumb = within(screen.getByRole('main')).getByRole('navigation', { name: '知识图谱' });
+    expect(breadcrumb).toHaveTextContent('知识图谱门市项目');
+    expect(breadcrumb.querySelectorAll('svg')).toHaveLength(1);
     expect(sessionStorage.getItem('preview:showcase-project:anonymous')).toBe('store');
     for (const link of screen.getAllByRole('link', { name: 'Try the demo' }))
       expect(link).toHaveAttribute('href', '/demo?project=store');
@@ -288,7 +300,9 @@ describe('showcase catalog navigation', () => {
     );
     expect(sidebar.querySelector('[data-screen-project="rental"]')).toBeNull();
     expect(sidebar.querySelector('[data-screen-project="store"]')).not.toBeNull();
-    expect(within(sidebar).queryByRole('link', { name: '关系图谱' })).not.toBeInTheDocument();
+    fireEvent.change(within(sidebar).getByRole('textbox'), { target: { value: '知识图谱' } });
+    const graphs = await within(sidebar).findByRole('navigation', { name: '知识图谱' });
+    expect(within(graphs).getByRole('link', { name: 'RIMO Rental' })).toBeInTheDocument();
   });
   it('keeps navigation available when graph data fails', async () => {
     graphCatalog.mockRejectedValue(new Error('读取失败'));

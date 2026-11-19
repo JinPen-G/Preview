@@ -136,7 +136,7 @@ export default function RequirementGraphPage({
     document.title = `${text(title)} · Preview`;
   }, [text, title]);
   const [query, setQuery] = useState('');
-  const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [view, setView] = useState<'2d' | '3d'>('3d');
   const [hiddenTypes, setHiddenTypes] = useState<GraphNodeType[]>([]);
   const [hiddenRelations, setHiddenRelations] = useState<GraphRelation[]>([]);
   const [resultLimit, setResultLimit] = useState(40);
@@ -508,18 +508,10 @@ export default function RequirementGraphPage({
     <main className="page_content__xGn__ requirement-graph-page">
       <div className="docs_docLayout__YK0uB">
         <article className="docs_docMain__jK5Ve">
-          <nav className="docs_breadcrumb__JFHCC" aria-label="Screens">
-            <Link to={`/screens${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`}>
-              Screens
-            </Link>
+          <nav className="docs_breadcrumb__JFHCC" aria-label={text('知识图谱')}>
+            <span>{text('知识图谱')}</span>
             <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
-            {projectName && (
-              <>
-                <Link to={`/screens?project=${encodeURIComponent(projectId)}`}>{text(projectName)}</Link>
-                <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
-              </>
-            )}
-            <span aria-current="page">{text(title)}</span>
+            <span aria-current="page">{text(projectName ?? title)}</span>
           </nav>
           <header className="docs_header__0YD_z">
             <div className="docs_headerCopy__ZDQWU">
@@ -580,74 +572,6 @@ export default function RequirementGraphPage({
                     className={`requirement-graph-workspace${expanded ? ' expanded' : ''}`}
                     aria-label={text('需求关系图谱')}
                   >
-                    <details className="requirement-graph-legend" open>
-                      <summary>
-                        {text('图例')}
-                        <span>{text('点击显示或隐藏，不改变点位')}</span>
-                        <ChevronDown size={13} />
-                      </summary>
-                      <div role="group" aria-label={text('节点图例')}>
-                        <small>{text('节点')}</small>
-                        {graphNodeLegend
-                          .filter((item) => nodes.some((member) => member.type === item.type))
-                          .map((item) => (
-                            <button
-                              type="button"
-                              key={item.type}
-                              aria-pressed={!hiddenTypes.includes(item.type)}
-                              onClick={() => {
-                                if (node?.type === item.type && !hiddenTypes.includes(item.type))
-                                  select(null);
-                                setHiddenTypes((previous) =>
-                                  previous.includes(item.type)
-                                    ? previous.filter((type) => type !== item.type)
-                                    : [...previous, item.type],
-                                );
-                              }}
-                            >
-                              <i style={{ background: item.color }} />
-                              {text(item.label)}
-                            </button>
-                          ))}
-                      </div>
-                      <div role="group" aria-label={text('关系图例')}>
-                        <small>{text('关系')}</small>
-                        {graphRelationLegend
-                          .filter((item) => edges.some((edge) => edge.relation === item.relation))
-                          .map((item) => (
-                            <button
-                              type="button"
-                              key={item.relation}
-                              aria-pressed={!hiddenRelations.includes(item.relation)}
-                              onClick={() =>
-                                setHiddenRelations((previous) =>
-                                  previous.includes(item.relation)
-                                    ? previous.filter((relation) => relation !== item.relation)
-                                    : [...previous, item.relation],
-                                )
-                              }
-                            >
-                              <i
-                                className={`requirement-graph-legend-line${item.relation === 'references' || item.relation === 'similar_to' ? ' dashed' : ''}`}
-                                style={{ color: item.color }}
-                              />
-                              {text(item.label)}
-                            </button>
-                          ))}
-                        {(hiddenTypes.length > 0 || hiddenRelations.length > 0) && (
-                          <button
-                            type="button"
-                            className="requirement-graph-legend-reset"
-                            onClick={() => {
-                              setHiddenTypes([]);
-                              setHiddenRelations([]);
-                            }}
-                          >
-                            {text('显示全部')}
-                          </button>
-                        )}
-                      </div>
-                    </details>
                     <div className="requirement-graph-frame" data-detail={node ? 'open' : undefined}>
                       <aside className="requirement-graph-finder" aria-label={text('查找需求点')}>
                         <label className="requirement-graph-search">
@@ -803,6 +727,74 @@ export default function RequirementGraphPage({
                         )}
                       </AnimatePresence>
                     </div>
+                    <details className="requirement-graph-legend" open>
+                      <summary>
+                        {text('图例')}
+                        <span>{text('点击显示或隐藏，不改变点位')}</span>
+                        <ChevronDown size={13} />
+                      </summary>
+                      <div role="group" aria-label={text('节点图例')}>
+                        <small>{text('节点')}</small>
+                        {graphNodeLegend
+                          .filter((item) => nodes.some((member) => member.type === item.type))
+                          .map((item) => (
+                            <button
+                              type="button"
+                              key={item.type}
+                              aria-pressed={!hiddenTypes.includes(item.type)}
+                              onClick={() => {
+                                if (node?.type === item.type && !hiddenTypes.includes(item.type))
+                                  select(null);
+                                setHiddenTypes((previous) =>
+                                  previous.includes(item.type)
+                                    ? previous.filter((type) => type !== item.type)
+                                    : [...previous, item.type],
+                                );
+                              }}
+                            >
+                              <i style={{ background: item.color }} />
+                              {text(item.label)}
+                            </button>
+                          ))}
+                      </div>
+                      <div role="group" aria-label={text('关系图例')}>
+                        <small>{text('关系')}</small>
+                        {graphRelationLegend
+                          .filter((item) => edges.some((edge) => edge.relation === item.relation))
+                          .map((item) => (
+                            <button
+                              type="button"
+                              key={item.relation}
+                              aria-pressed={!hiddenRelations.includes(item.relation)}
+                              onClick={() =>
+                                setHiddenRelations((previous) =>
+                                  previous.includes(item.relation)
+                                    ? previous.filter((relation) => relation !== item.relation)
+                                    : [...previous, item.relation],
+                                )
+                              }
+                            >
+                              <i
+                                className={`requirement-graph-legend-line${item.relation === 'references' || item.relation === 'similar_to' ? ' dashed' : ''}`}
+                                style={{ color: item.color }}
+                              />
+                              {text(item.label)}
+                            </button>
+                          ))}
+                        {(hiddenTypes.length > 0 || hiddenRelations.length > 0) && (
+                          <button
+                            type="button"
+                            className="requirement-graph-legend-reset"
+                            onClick={() => {
+                              setHiddenTypes([]);
+                              setHiddenRelations([]);
+                            }}
+                          >
+                            {text('显示全部')}
+                          </button>
+                        )}
+                      </div>
+                    </details>
                     <footer className="requirement-graph-status">
                       <span>
                         {visibility.nodeIds.size} {text('个需求点')} · {visibility.edgeIds.size}{' '}
