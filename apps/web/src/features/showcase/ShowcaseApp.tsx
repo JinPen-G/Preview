@@ -203,6 +203,19 @@ export function Detail({ page }: { page: CatalogPage }) {
     [expanded, setExpanded] = useState(false);
   const narrowViewport = useNarrowViewport();
   const nativePreview = useRef<HTMLDivElement | null>(null);
+  const [screenPortals] = useState(() => {
+    const host = document.createElement('div');
+    host.className = 'showcase-screen-portals';
+    return host;
+  });
+  const mountScreenPortals = useCallback(
+    (anchor: HTMLDivElement | null) => {
+      if (!anchor) return;
+      anchor.appendChild(screenPortals);
+      return () => screenPortals.remove();
+    },
+    [screenPortals],
+  );
   const [fullscreenBounds, setFullscreenBounds] = useState<{
     top: number;
     left: number;
@@ -292,6 +305,7 @@ export function Detail({ page }: { page: CatalogPage }) {
       : '此页面需要登录，并由管理员授权后查看。';
   return (
     <LocalizedView>
+      {isScreen && permitted && <div ref={mountScreenPortals} />}
       <main className="page_content__xGn__">
         <div className="docs_docLayout__YK0uB">
           <article className="docs_docMain__jK5Ve">
@@ -513,7 +527,11 @@ export function Detail({ page }: { page: CatalogPage }) {
                         <LoadingStage label="读取页面…" />
                       ) : detail ? (
                         isScreen ? (
-                          <ScreenWorkspace page={page} compact={mobile || (expanded && narrowViewport)}>
+                          <ScreenWorkspace
+                            page={page}
+                            compact={mobile || (expanded && narrowViewport)}
+                            portalContainer={screenPortals}
+                          >
                             <div data-prototype-canvas={tab === 'preview' || undefined}>
                               <RuntimePage
                                 key={detail.contentRevision}
@@ -594,6 +612,7 @@ export function Detail({ page }: { page: CatalogPage }) {
                   title={text(pageTitle)}
                   mobile={mobile}
                   nativeRef={nativePreview}
+                  screenPortals={isScreen ? screenPortals : undefined}
                   toolbar={<SiteCollaborationControls />}
                   initialBounds={fullscreenBounds}
                   onExitComplete={() => setReservedHeight(undefined)}

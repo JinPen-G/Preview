@@ -4,9 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { motionPreferenceAdapter } from './plugins/motion-preference-plugin.js';
 import { layoutMeasurementAdapter } from './plugins/layout-measurement-plugin.js';
 import { screenPortalAdapter } from './plugins/screen-portal-plugin.js';
+import { tableHeaderAdapter } from './plugins/table-header-plugin.js';
 
 export default defineConfig({
-  plugins: [react(), motionPreferenceAdapter(), layoutMeasurementAdapter(), screenPortalAdapter()],
+  plugins: [
+    tableHeaderAdapter(),
+    react(),
+    motionPreferenceAdapter(),
+    layoutMeasurementAdapter(),
+    screenPortalAdapter(),
+  ],
   css: { postcss: { plugins: [] } },
   resolve: {
     alias: {

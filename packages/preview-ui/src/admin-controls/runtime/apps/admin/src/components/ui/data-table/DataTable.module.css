@@ -77,7 +77,7 @@
 .root[data-column-layout="content"] .table tr > th:last-child[data-column-id="actions"] { padding-inline: var(--space-3); }
 .root[data-column-layout="content"] .table td[data-column-id="actions"] .rowActions { width: 100%; justify-content: space-between; gap: var(--space-1); }
 .root[data-column-layout="content"] .table td[data-column-id="actions"] .rowPrimary { flex: 1; padding-inline-start: var(--space-2) !important; }
-.legacyContent { min-width: 0; max-width: 100%; }
+.legacyContent { min-width: 0; max-width: 100%; container: table-viewport / inline-size; }
 .legacyContent :global(.ant-table-cell) { padding-inline: var(--space-2); overflow-wrap: anywhere; }
 .legacyContent :global(.ant-table-cell:first-child) { padding-inline-start: var(--space-4); }
 .legacyContent :global(.ant-table-cell:last-child) { padding-inline-end: var(--space-4); }
@@ -112,6 +112,48 @@
 .rowActions { display: inline-flex; align-items: center; justify-content: flex-start; gap: var(--space-2); min-height: var(--rental-table-leading-height); width: fit-content; max-width: 100%; }
 .rowPrimary { height: var(--rental-table-leading-height); min-height: var(--rental-table-leading-height) !important; padding: 0 !important; min-width: 0; justify-content: flex-start; font-size: inherit; }
 .rowPrimary svg { flex-shrink: 0; }
+/* Preserve the page's actions while using the Rental OS row control metrics.
+   Imported layouts can set fixed or full widths on their original buttons. */
+.table :is(th[data-column-id="actions"], td.actionColumn),
+.legacyContent :global(.ant-table-cell).actionColumn {
+  width: 1%;
+  vertical-align: middle;
+  padding-inline: var(--space-2);
+  white-space: nowrap;
+}
+/* The imported flex groups otherwise wrap at the widest single button when
+   auto table layout computes their minimum width. */
+td.actionColumn > :is(:global(.flex), :global(.inline-flex), :global(.ant-space), :global(.rimo-actions), :global(.action-btns)) {
+  width: max-content;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+@container table-viewport (max-width: 520px) {
+  td.actionColumn > :is(:global(.flex), :global(.inline-flex), :global(.ant-space), :global(.rimo-actions), :global(.action-btns)) {
+    max-width: 48cqi;
+    flex-wrap: wrap;
+  }
+}
+td.actionColumn :global([data-rental-arc-button]) {
+  width: auto !important;
+  min-width: 0 !important;
+  height: var(--rental-table-leading-height) !important;
+  min-height: var(--rental-table-leading-height) !important;
+  margin: 0 !important;
+  padding-inline: var(--space-2) !important;
+  border-radius: var(--rental-ui-radius-button);
+  font-size: inherit;
+  white-space: nowrap;
+  flex: none;
+}
+td.actionColumn :global([data-rental-arc-button][data-button-kind="primary"]:not([data-button-danger])) {
+  color: var(--foreground);
+  background: var(--surface);
+  border-color: var(--border);
+}
+td.actionColumn :global([data-rental-arc-button][data-button-kind="primary"]:not([data-button-danger]):hover:not(:disabled)) {
+  background: var(--surface-muted);
+}
 /* Pinned Tablecn task-column trigger: size-8, p-0, ghost, muted while open. */
 .rowMenuTrigger { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--rental-control-height-toolbar); height: var(--rental-control-height-toolbar); padding: 0; border: 0; border-radius: var(--rental-ui-radius-button); background: transparent; color: var(--foreground); cursor: pointer; }
 .rowMenuTrigger:hover:not(:disabled), .rowMenuTrigger[data-state="open"] { background: var(--surface-muted); }

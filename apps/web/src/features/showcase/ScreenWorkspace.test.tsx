@@ -55,7 +55,7 @@ beforeEach(() => {
   });
 });
 
-it('keeps business dialogs inside the scaled screen and restores their trigger', async () => {
+it('opens a business dialog outside the screen and returns focus to its trigger', async () => {
   function Business() {
     const [open, setOpen] = useState(false);
     return (
@@ -67,26 +67,39 @@ it('keeps business dialogs inside the scaled screen and restores their trigger',
       </>
     );
   }
+  function Preview() {
+    const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
+    return (
+      <>
+        <div ref={setPortalContainer} />
+        <ScreenWorkspace page={page} compact={false} portalContainer={portalContainer}>
+          <Business />
+        </ScreenWorkspace>
+      </>
+    );
+  }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <PlatformLocaleProvider>
-          <ScreenWorkspace page={page} compact={false}>
-            <Business />
-          </ScreenWorkspace>
+          <Preview />
         </PlatformLocaleProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Open business dialog' }));
+  const trigger = screen.getByRole('button', { name: 'Open business dialog' });
+  trigger.focus();
+  fireEvent.click(trigger);
   const dialog = await screen.findByRole('dialog', { name: 'Business dialog' });
-  expect(view.container.querySelector('.showcase-screen-portals')).toContainElement(dialog);
+  expect(view.container.firstElementChild).toContainElement(dialog);
+  expect(view.container.querySelector('.showcase-screen-workspace')).not.toContainElement(dialog);
   expect(screen.getByRole('textbox', { name: 'Dialog draft' })).toHaveValue('Keep this');
   fireEvent.click(screen.getByRole('button', { name: '关闭' }));
   await waitFor(() =>
     expect(screen.queryByRole('dialog', { name: 'Business dialog' })).not.toBeInTheDocument(),
   );
+  await waitFor(() => expect(trigger).toHaveFocus());
   client.clear();
 });
 afterEach(() => {
@@ -101,7 +114,7 @@ it('keeps the full application navigation mounted across preview sizes without a
   const frame = (compact: boolean) => (
     <MemoryRouter initialEntries={['/pages/rental/operation/vehicles']}>
       <PlatformLocaleProvider>
-        <ScreenWorkspace page={page} compact={compact}>
+        <ScreenWorkspace page={page} compact={compact} portalContainer={null}>
           {content}
         </ScreenWorkspace>
         <Location />

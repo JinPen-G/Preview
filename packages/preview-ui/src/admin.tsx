@@ -36,7 +36,7 @@ export { DatePicker } from './admin-controls/runtime/apps/admin/src/components/u
 export { TableRefreshProvider } from './admin-controls/runtime/apps/admin/src/components/ui/data-table/TableRefreshContext';
 export { ListFilterItem } from './admin-controls/runtime/apps/admin/src/components/ui/ListFilterBar';
 export { App } from './admin-controls/runtime/apps/admin/src/components/ui/App';
-export { InputNumber, Tag, Descriptions, Card, Col, Row, Space, Typography } from 'antd';
+export { InputNumber, Radio, Tag, Descriptions, Card, Col, Row, Space, Typography } from 'antd';
 export { LoadingState, LoadingStage } from './LoadingState';
 export function AdminFeedbackProvider({ children }: { children: ReactNode }) {
   return (

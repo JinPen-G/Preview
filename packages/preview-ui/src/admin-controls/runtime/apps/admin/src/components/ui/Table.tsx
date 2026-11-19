@@ -61,13 +61,38 @@ function titleText(title: ReactNode): string {
   return "";
 }
 
-/** Action access must survive horizontal scrolling in both renderers. Keep an
- * explicit pinning choice, and descend into the Ant grouped-column fallback. */
-function pinActionColumns<T extends object>(columns: TableProps<T>["columns"], actionLabel: string): TableProps<T>["columns"] {
-  return columns?.map(column => "children" in column
-    ? { ...column, children: pinActionColumns<T>(column.children, actionLabel)! }
-    : column.fixed == null && (column.key === "actions" || column.key === "action" || titleText(typeof column.title === "function" ? column.title({}) : column.title) === actionLabel)
-      ? { ...column, fixed: "right" as const } : column);
+function isActionColumn<T extends object>(column: ColumnType<T>, actionLabel: string) {
+  if (column.key === "actions" || column.key === "action") return true;
+  const title = typeof column.title === "function" ? column.title({}) : column.title;
+  return [actionLabel, "操作", "Actions"].includes(titleText(title).trim());
+}
+
+function isPreparedActionColumn<T extends object>(column: ColumnType<T>) {
+  return column.className?.split(/\s+/).includes(styles.actionColumn) ?? false;
+}
+
+/** Use the content width of the existing actions in both table renderers. */
+function prepareActionColumns<T extends object>(columns: TableProps<T>["columns"], actionLabel: string): TableProps<T>["columns"] {
+  return columns?.map(column => {
+    if ("children" in column) {
+      return { ...column, children: prepareActionColumns<T>(column.children, actionLabel)! };
+    }
+    if (!isActionColumn(column, actionLabel)) return column;
+    return {
+      ...column,
+      fixed: column.fixed ?? "right",
+      width: "1%",
+      minWidth: undefined,
+      align: "left",
+      className: [column.className, styles.actionColumn].filter(Boolean).join(" "),
+    };
+  });
+}
+
+function hasActionColumn<T extends object>(columns: TableProps<T>["columns"]): boolean {
+  return columns?.some(column => "children" in column
+    ? hasActionColumn<T>(column.children)
+    : isPreparedActionColumn(column)) ?? false;
 }
 
 /** Legacy widths are sizing hints, not minimums in a responsive list. Preserve
@@ -75,7 +100,8 @@ function pinActionColumns<T extends object>(columns: TableProps<T>["columns"], a
 function naturalColumns<T extends object>(columns: TableProps<T>["columns"]): TableProps<T>["columns"] {
   return columns?.map(column => "children" in column
     ? { ...column, children: naturalColumns<T>(column.children)! }
-    : { ...column, width: undefined, minWidth: column.minWidth ?? ADMIN_TABLE_METRICS.columnMinWidth });
+    : isPreparedActionColumn(column) ? column
+      : { ...column, width: undefined, minWidth: column.minWidth ?? ADMIN_TABLE_METRICS.columnMinWidth });
 }
 
 const SHORT_COLUMN_FIELD = /(?:status|state|amount|price|balance|total|count|quantity|capacity|version|currency|enabled|active|phone|date|time|At$)/i;
@@ -101,20 +127,38 @@ function ExpansionCell<T>({ row }: CellContext<T, unknown>) {
 
 export function Table<T extends object>(props: BusinessTableProps<T>) {
   const { t } = useLocale();
-  const columns = useMemo(() => pinActionColumns(props.columns, t("操作")), [props.columns, t]);
+  const columns = useMemo(() => prepareActionColumns(props.columns, t("操作")), [props.columns, t]);
+  const compactActions = hasActionColumn(columns);
+  const tableLayout = compactActions ? "auto" : props.tableLayout;
   const reader = useTableRefresh();
   const controls = useListControls();
   const toolbarHeading = useListHeading();
   const inherited = props.onRefresh === undefined;
-  const resolved = { ...props, columns, toolbarHeading, toolbar: props.toolbar ?? controls, onRefresh: (inherited ? reader.onRefresh : props.onRefresh) ?? undefined,
+  const resolved = { ...props, columns, tableLayout, toolbarHeading, toolbar: props.toolbar ?? controls, onRefresh: (inherited ? reader.onRefresh : props.onRefresh) ?? undefined,
     refreshing: props.refreshing ?? (inherited ? reader.busy : false) };
   const selection = props.rowSelection;
   const incompatibleSelection = selection && (selection.type === "radio" || selection.onSelect || selection.onSelectAll || selection.onSelectInvert || selection.onSelectNone || selection.selections || selection.renderCell || selection.columnTitle || selection.onCell || selection.checkStrictly === false);
   const incompatible = incompatibleSelection || props.components || props.summary || props.children ||
     props.columns?.some(column => "children" in column || column.filters || column.filterDropdown) ||
     props.dataSource?.some(row => Array.isArray((row as Record<string, unknown>).children));
+  if (!incompatible) return <BusinessTable {...resolved} />;
+
   const { refreshing: _refreshing, ...fallbackProps } = props;
-  return incompatible ? <>{toolbarHeading && <div className={styles.sectionHeader}><ListSectionTitle {...toolbarHeading} />{toolbarHeading.extra && <div className={styles.sectionActions}>{toolbarHeading.extra}</div>}</div>}<ListHeadingContext.Provider value={null}><div className={styles.legacyContent}><AntTable<T> {...fallbackProps} tableLayout={props.tableLayout ?? "auto"} columns={props.tableLayout === "fixed" ? columns : naturalColumns(columns)} scroll={props.scroll ? { ...props.scroll, x: props.tableLayout === "fixed" ? props.scroll.x : "100%" } : undefined} /></div></ListHeadingContext.Provider></> : <BusinessTable {...resolved} />;
+  let scroll = props.scroll;
+  if (compactActions) scroll = { ...scroll, x: "max-content" };
+  else if (scroll && tableLayout !== "fixed") scroll = { ...scroll, x: "100%" };
+  return <>
+    {toolbarHeading && <div className={styles.sectionHeader}>
+      <ListSectionTitle {...toolbarHeading} />
+      {toolbarHeading.extra && <div className={styles.sectionActions}>{toolbarHeading.extra}</div>}
+    </div>}
+    <ListHeadingContext.Provider value={null}>
+      <div className={styles.legacyContent}>
+        <AntTable<T> {...fallbackProps} tableLayout={tableLayout ?? "auto"}
+          columns={tableLayout === "fixed" ? columns : naturalColumns(columns)} scroll={scroll} />
+      </div>
+    </ListHeadingContext.Provider>
+  </>;
 }
 Table.listToolbarHost = true;
 
@@ -165,7 +209,7 @@ function BusinessTable<T extends object>(props: BusinessTableProps<T> & { toolba
   const columns: ColumnDef<T, unknown>[] = sourceColumns.map((column, index) => {
     const title = typeof column.title === "function" ? column.title({}) : column.title;
     const label = titleText(title) || t("列 {index}", { index: index + 1 });
-    const action = label === t("操作") || column.key === "actions" || column.key === "action";
+    const action = isPreparedActionColumn(column);
     let id = action ? "actions" : String(column.key ?? (Array.isArray(column.dataIndex) ? column.dataIndex.join(".") : column.dataIndex) ?? `column_${index}`);
     if (ids.has(id)) id = `${id}_${index}`;
     ids.add(id); labels[id] = label; columnSources.set(id, column);
@@ -186,7 +230,7 @@ function BusinessTable<T extends object>(props: BusinessTableProps<T> & { toolba
       minSize: column.minWidth ?? ADMIN_TABLE_METRICS.columnMinWidth, enableSorting: canSort, enableHiding: index !== 0 && !action,
       sortUndefined: "last", sortingFn: compare ? (a, b) => compare(a.original, b.original, "ascend") : "auto",
       header: BusinessHeader, cell: BusinessCell,
-      meta: { cellAlign: "middle", contentSizing: { compact, minWidth: column.minWidth ?? (compact ? ADMIN_TABLE_METRICS.columnMinWidth : ADMIN_TABLE_METRICS.contentMinWidth) }, motion: !action && column.dataIndex != null ? { value: row => {
+      meta: { cellAlign: "middle", contentSizing: { compact, minWidth: action ? undefined : column.minWidth ?? (compact ? ADMIN_TABLE_METRICS.columnMinWidth : ADMIN_TABLE_METRICS.contentMinWidth) }, motion: !action && column.dataIndex != null ? { value: row => {
         // Track explicit scalar facts, never rendered nodes, clocks or whole row objects.
         const value = readTableValue(row, column.dataIndex);
         return value == null || typeof value === "string" || typeof value === "number" ? value : undefined;

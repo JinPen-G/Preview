@@ -18,10 +18,12 @@ import './screen-workspace.css';
 export function ScreenWorkspace({
   page,
   compact,
+  portalContainer,
   children,
 }: {
   page: CatalogPage;
   compact: boolean;
+  portalContainer: HTMLElement | null;
   children: ReactNode;
 }) {
   const text = useShowcaseText();
@@ -37,7 +39,7 @@ export function ScreenWorkspace({
   return (
     <UiEnvironmentProvider dark={resolvedMode === 'dark'} reducedMotion={reduced}>
       <div className="showcase-screen-workspace">
-        <ScreenPortalProvider>
+        <ScreenPortalProvider container={portalContainer}>
           <FrameworkShell
             embedded
             compact={compact}

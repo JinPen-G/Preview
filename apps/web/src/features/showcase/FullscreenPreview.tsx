@@ -27,6 +27,7 @@ function relocatePreview(container: Node, element: Node, next: Node | null) {
 function FullscreenSurface({
   title,
   nativeRef,
+  screenPortals,
   mobile,
   initialBounds,
   toolbar,
@@ -34,6 +35,7 @@ function FullscreenSurface({
 }: {
   title: string;
   nativeRef: RefObject<HTMLDivElement | null>;
+  screenPortals?: HTMLElement | null;
   mobile: boolean;
   initialBounds?: PreviewBounds | null;
   toolbar?: ReactNode;
@@ -44,6 +46,7 @@ function FullscreenSurface({
   const [origin] = useState(initialBounds);
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const host = useRef<HTMLDivElement | null>(null);
+  const panel = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     const update = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', update);
@@ -59,6 +62,17 @@ function FullscreenSurface({
       if (parent) relocatePreview(parent, nativeElement, next?.parentNode === parent ? next : null);
     };
   }, [nativeRef]);
+  useLayoutEffect(() => {
+    const destination = panel.current;
+    if (!destination || !screenPortals?.parentNode) return;
+    const parent = screenPortals.parentNode;
+    const next = screenPortals.nextSibling;
+    relocatePreview(destination, screenPortals, null);
+    return () => {
+      if (screenPortals.parentNode === destination && parent.isConnected)
+        relocatePreview(parent, screenPortals, next?.parentNode === parent ? next : null);
+    };
+  }, [screenPortals]);
   const full = { top: 0, left: 0, width: viewport.width, height: viewport.height, borderRadius: 0 };
   return (
     <>
@@ -83,7 +97,11 @@ function FullscreenSurface({
           // capture flag can therefore call an inside native click "outside";
           // physical containment is authoritative for this transferred mount.
           const target = event.detail.originalEvent.target;
-          if (target instanceof Node && nativeRef.current?.contains(target)) event.preventDefault();
+          if (
+            target instanceof Node &&
+            (nativeRef.current?.contains(target) || screenPortals?.contains(target))
+          )
+            event.preventDefault();
         }}
         onEscapeKeyDown={(event) => {
           onEscapeKeyDown?.(event);
@@ -91,6 +109,7 @@ function FullscreenSurface({
           const target = event.target;
           if (
             nativeRef.current?.querySelector('[role="dialog"]') ||
+            screenPortals?.querySelector('[role="dialog"]') ||
             (target instanceof Element &&
               target.closest(
                 '[role="menu"], [role="listbox"], [role="combobox"][aria-expanded="true"], [data-preview-escape-layer]',
@@ -100,6 +119,7 @@ function FullscreenSurface({
         }}
       >
         <motion.div
+          ref={panel}
           className="preview-shell_panel__Pc6kR showcase-fullscreen-panel"
           style={{ right: 'auto', bottom: 'auto' }}
           initial={origin && !reduced ? { ...origin } : { ...full, opacity: 0 }}
@@ -145,6 +165,7 @@ export function FullscreenPreview({
   title,
   mobile,
   nativeRef,
+  screenPortals,
   initialBounds,
   onExitComplete,
   toolbar,
@@ -155,6 +176,7 @@ export function FullscreenPreview({
   title: string;
   mobile: boolean;
   nativeRef: RefObject<HTMLDivElement | null>;
+  screenPortals?: HTMLElement | null;
   initialBounds?: PreviewBounds | null;
   onExitComplete?: () => void;
   toolbar?: ReactNode;
@@ -172,6 +194,7 @@ export function FullscreenPreview({
                 title={title}
                 mobile={mobile}
                 nativeRef={nativeRef}
+                screenPortals={screenPortals}
                 initialBounds={initialBounds}
                 toolbar={toolbar}
                 onEscapeKeyDown={onEscapeKeyDown}

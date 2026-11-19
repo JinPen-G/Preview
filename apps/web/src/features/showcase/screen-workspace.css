@@ -10,18 +10,13 @@
   background: var(--surface-muted);
 }
 .showcase-screen-portals {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 120;
   pointer-events: none;
 }
 .showcase-screen-portals > * {
   pointer-events: auto;
-}
-.showcase-screen-portals [data-rental-arc-modal] {
-  max-width: calc(100% - 32px) !important;
-  max-height: calc(var(--preview-screen-height) - 32px);
-  overflow: auto;
 }
 .showcase-screen-workspace .preview-screen-stage {
   --rental-sidebar-expanded-width: 248px;

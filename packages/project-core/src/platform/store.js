@@ -6,6 +6,7 @@ import { mkdirSync, lstatSync } from 'node:fs';
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
 import { migrateNativeDatabase, DATABASE_SCHEMA } from './schema.js';
+import { MAX_CLIENT_PAGES, MAX_PROJECT_CLIENTS } from './menu-limits.js';
 
 const ID = /^[a-z0-9][a-z0-9-]{1,63}$/;
 export class NativeError extends Error {
@@ -264,7 +265,7 @@ export function createNativeStore({
   function normalizeConfiguration(input, moduleKey) {
     if (
       !Array.isArray(input.clients) ||
-      input.clients.length > 16 ||
+      input.clients.length > MAX_PROJECT_CLIENTS ||
       !Array.isArray(input.links) ||
       input.links.length > 200
     )
@@ -275,7 +276,7 @@ export function createNativeStore({
       if (['documents', 'config'].includes(id)) fail(400, '客户端编码与平台保留入口冲突');
       if (ids.has(id)) fail(400, '客户端编码重复');
       ids.add(id);
-      if (!Array.isArray(client.pages) || client.pages.length > 40) fail(400, '菜单配置无效');
+      if (!Array.isArray(client.pages) || client.pages.length > MAX_CLIENT_PAGES) fail(400, '菜单配置无效');
       const pageIds = new Set();
       const pages = client.pages.map((page) => {
         if (!modules[moduleKey].includes(page.key) || pageIds.has(page.key))
@@ -633,7 +634,8 @@ export function createNativeStore({
         if (!account) fail(404, '账号不存在', 'NOT_FOUND');
         if (account.role === 'admin' || (account.disabled && input.pages?.length))
           fail(400, '该账号不能接受页面授权');
-        if (!Array.isArray(input.pages) || input.pages.length > 640) fail(400, '授权菜单无效');
+        if (!Array.isArray(input.pages) || input.pages.length > MAX_PROJECT_CLIENTS * MAX_CLIENT_PAGES)
+          fail(400, '授权菜单无效');
         const configuration = JSON.parse(row.configuration);
         const keys = new Set();
         for (const page of input.pages) {

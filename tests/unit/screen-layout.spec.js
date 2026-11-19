@@ -1,10 +1,12 @@
 import { createElement, useState } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { fileURLToPath, URL as NodeURL } from 'node:url';
 import { layoutMeasurementAdapter } from '../../plugins/layout-measurement-plugin.js';
 import { getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { DataTable } from '../../packages/preview-ui/src/admin-controls/runtime/apps/admin/src/components/ui/data-table/DataTable';
+import { AdminFeedbackProvider, Table } from '@preview/ui/admin';
 import {
   ListFilterBar,
   ListFilterItem,
@@ -125,4 +127,40 @@ it('measures natural column widths only when pinning needs an offset', () => {
   const root = view.container.querySelector('[data-column-layout="content"]');
   expect(root.style.getPropertyValue('--table-pin-0')).toBe('0px');
   expect(root.style.getPropertyValue('--table-pin-1')).toBe('150px');
+});
+
+it('keeps an interactive column heading and the standard column controls on adjacent headings', () => {
+  class Observer {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  vi.stubGlobal('ResizeObserver', Observer);
+  vi.stubGlobal('IntersectionObserver', Observer);
+  const onAction = vi.fn();
+  const heading = createElement(
+    'div',
+    { 'data-table-heading': 'custom' },
+    'Period',
+    createElement('button', { type: 'button', onClick: onAction }, 'Choose order'),
+  );
+  render(
+    createElement(Table, {
+      columns: [
+        { dataIndex: 'period', title: heading },
+        { dataIndex: 'name', title: 'Name' },
+      ],
+      dataSource: [{ key: 1, period: 'November', name: 'Example' }],
+      pagination: false,
+    }),
+    {
+      wrapper: ({ children }) =>
+        createElement(MemoryRouter, {}, createElement(AdminFeedbackProvider, {}, children)),
+    },
+  );
+  const header = screen.getByRole('columnheader', { name: /Period/ });
+  fireEvent.click(within(header).getByRole('button', { name: 'Choose order' }));
+  expect(onAction).toHaveBeenCalledOnce();
+  expect(header.querySelector('button button')).toBeNull();
+  expect(screen.getByRole('button', { name: /Name.*列选项/ })).toBeInTheDocument();
 });

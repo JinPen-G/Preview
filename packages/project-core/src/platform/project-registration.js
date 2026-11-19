@@ -11,6 +11,7 @@ import { loadContentPackage, loadPrototypeRevisions } from './project-content.js
 import { loadComponentRegistryItem, validateComponentRegistry } from './component-registry.js';
 import { fail } from './store.js';
 import { requirementGraphView } from './requirement-graph.js';
+import { MAX_CLIENT_PAGES, MAX_PROJECT_CLIENTS } from './menu-limits.js';
 
 const id = (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{1,63}$/.test(value);
 const requireValue = (value, message) => {
@@ -125,7 +126,7 @@ export function validateProjectRegistration(input, existingModules = [], existin
       '页面安装项未登记',
     );
   const clients = module.initialClients ?? [];
-  requireValue(Array.isArray(clients) && clients.length <= 16, '初始菜单客户端无效或过多');
+  requireValue(Array.isArray(clients) && clients.length <= MAX_PROJECT_CLIENTS, '初始菜单客户端无效或过多');
   const clientIds = new Set();
   for (const client of clients) {
     allowedKeys(client, ['id', 'name', 'icon', 'layout', 'enabled', 'position', 'defaultPage', 'pages']);
@@ -142,7 +143,7 @@ export function validateProjectRegistration(input, existingModules = [], existin
       '初始客户端无效',
     );
     requireValue(Number.isInteger(client.position) && client.position >= 0, '客户端排序无效');
-    requireValue(Array.isArray(client.pages) && client.pages.length <= 40, '初始菜单无效');
+    requireValue(Array.isArray(client.pages) && client.pages.length <= MAX_CLIENT_PAGES, '初始菜单无效');
     const menuKeys = new Set();
     for (const page of client.pages) {
       allowedKeys(page, ['key', 'label', 'group', 'visible', 'access', 'position']);
