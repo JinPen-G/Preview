@@ -214,6 +214,108 @@ afterEach(async () => {
     await fs.rm(item.root, { recursive: true, force: true });
   }
 });
+test('explicit scope removes only current unmapped warnings and never acts as a review receipt', async () => {
+  const item = await fixture();
+  item.graph.nodes = item.graph.nodes.filter((node) => node.id !== 'orphan');
+  const document = item.snapshot.manifest.requirements.find((doc) => doc.id === 'orphan');
+  item.snapshot.prototypeRevisions['operation/item-transfer'] = graphHash('prototype');
+  item.graph.scope = {
+    description: 'Business decisions only; supporting pages remain readable.',
+    excludedRequirements: [
+      {
+        requirementId: 'orphan',
+        revision: graphHash(orphanDoc),
+        bindingRevision: requirementBindingRevision(document, item.snapshot.files),
+        reason: 'Presentation only',
+      },
+    ],
+    excludedPrototypes: [
+      {
+        clientId: 'operation',
+        pageKey: 'item-transfer',
+        revision: graphHash('prototype'),
+        reason: 'Account administration',
+      },
+    ],
+  };
+  delete item.graph.review.requirements.orphan;
+  const save = () => item.snapshot.files.set('graph.json', Buffer.from(JSON.stringify(item.graph)));
+  save();
+  const current = requirementGraphView(item.snapshot, project);
+  expect(current.diagnostics).not.toContainEqual({ code: 'UNMAPPED_REQUIREMENT', requirementId: 'orphan' });
+  expect(current.diagnostics).not.toContainEqual({
+    code: 'UNMAPPED_PROTOTYPE',
+    prototypeKey: 'operation/item-transfer',
+  });
+  expect(current.diagnostics).toContainEqual({ code: 'UNREVIEWED_REQUIREMENT', requirementId: 'orphan' });
+  expect(current.freshness).toBe('stale');
+  expect(queryRequirementGraph(current, 'get_requirement_graph').scope).toEqual(item.graph.scope);
+  expect(queryRequirementGraph(current, 'get_graph_node', { id: 'field' }).scope).toEqual({
+    description: item.graph.scope.description,
+    excludedRequirementCount: 1,
+    excludedPrototypeCount: 1,
+  });
+  item.snapshot.files.set(document.path, Buffer.from(`${orphanDoc}\nNew business decision.`));
+  item.snapshot.prototypeRevisions['operation/item-transfer'] = graphHash('changed');
+  const changed = requirementGraphView(item.snapshot, project);
+  expect(changed.diagnostics).toEqual(
+    expect.arrayContaining([
+      { code: 'STALE_SCOPE', requirementId: 'orphan' },
+      { code: 'UNMAPPED_REQUIREMENT', requirementId: 'orphan' },
+      { code: 'STALE_SCOPE', prototypeKey: 'operation/item-transfer' },
+      { code: 'UNMAPPED_PROTOTYPE', prototypeKey: 'operation/item-transfer' },
+    ]),
+  );
+  item.graph.scope.excludedRequirements[0].requirementId = 'public';
+  expect(() => validateRequirementGraph(item.graph)).toThrow();
+});
+
+test('scope receipts respect document and page access and include binding changes', async () => {
+  const item = await fixture();
+  item.graph.nodes = item.graph.nodes.filter((node) => node.id !== 'secret');
+  item.graph.edges = item.graph.edges.filter((edge) => edge.id !== 'private-link');
+  const document = item.snapshot.manifest.requirements.find((doc) => doc.id === 'private');
+  item.snapshot.prototypeRevisions['operation/item-transfer'] = graphHash('private prototype');
+  item.graph.scope = {
+    description: 'Business scope',
+    excludedRequirements: [
+      {
+        requirementId: 'private',
+        revision: graphHash(privateDoc),
+        bindingRevision: requirementBindingRevision(document, item.snapshot.files),
+        reason: 'Private reason',
+      },
+    ],
+    excludedPrototypes: [
+      {
+        clientId: 'operation',
+        pageKey: 'item-transfer',
+        revision: graphHash('private prototype'),
+        reason: 'Private page reason',
+      },
+    ],
+  };
+  item.graph.review.graphRevision = reviewedGraphRevision(validateRequirementGraph(item.graph));
+  item.snapshot.files.set('graph.json', Buffer.from(JSON.stringify(item.graph)));
+  const options = {
+    documents: item.snapshot.manifest.requirements.filter((doc) => doc.id !== 'private'),
+    allowedPage: (page) => page.pageKey !== 'item-transfer',
+    scope: 'authorized-web',
+  };
+  const visible = requirementGraphView(item.snapshot, project, options);
+  expect(visible.scope.excludedRequirements).toEqual([]);
+  expect(visible.scope.excludedPrototypes).toEqual([]);
+  expect(JSON.stringify(visible)).not.toContain('Private reason');
+  document.status = 'draft';
+  expect(requirementGraphView(item.snapshot, project).diagnostics).toContainEqual({
+    code: 'STALE_SCOPE',
+    requirementId: 'private',
+  });
+  expect(requirementGraphView(item.snapshot, project, options).graphRevision).toBe(visible.graphRevision);
+  const before = reviewedGraphRevision(item.graph);
+  item.graph.scope.excludedRequirements[0].reason = 'Reconsidered scope';
+  expect(reviewedGraphRevision(item.graph)).not.toBe(before);
+});
 test('impact follows relation policy and evidence; shared topics never imply dependencies', async () => {
   const item = await fixture(),
     view = requirementGraphView(item.snapshot, project);

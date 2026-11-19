@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { PlatformLocaleProvider } from '@/features/locale/platform-locale';
 import { FullscreenPreview } from './FullscreenPreview';
 import { useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 afterEach(cleanup);
 function Fixture({ disclosure = false }: { disclosure?: boolean }) {
@@ -36,7 +37,7 @@ function Fixture({ disclosure = false }: { disclosure?: boolean }) {
           {nativeDialog && (
             <section role="dialog" aria-label="Native form">
               <input aria-label="Native field" />
-              <button onClick={() => setNativeDialog(false)}>Close native form</button>
+              <button onClick={() => flushSync(() => setNativeDialog(false))}>Close native form</button>
             </section>
           )}
         </div>
@@ -105,6 +106,20 @@ it('keeps fullscreen open when a transferred native button opens and edits a nes
   expect(input).toHaveValue('Editing in fullscreen');
   expect(screen.getByRole('dialog', { name: 'Example' })).toBeInTheDocument();
   fireEvent.click(screen.getByText('Close native form'));
+  expect(screen.getByRole('dialog', { name: 'Example' })).toBeInTheDocument();
+});
+
+it('keeps fullscreen open after an inside pointer target is removed by its click handler', async () => {
+  render(<Fixture />);
+  fireEvent.click(screen.getByText('Open fullscreen'));
+  await screen.findByRole('dialog', { name: 'Example' });
+  fireEvent.click(screen.getByText('Open native form'));
+  const close = await screen.findByText('Close native form');
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  fireEvent(close, new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  fireEvent.click(close);
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  expect(screen.queryByRole('dialog', { name: 'Native form' })).not.toBeInTheDocument();
   expect(screen.getByRole('dialog', { name: 'Example' })).toBeInTheDocument();
 });
 

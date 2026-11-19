@@ -39,7 +39,7 @@ function evidence(input) {
   });
 }
 export function validateRequirementGraph(input) {
-  record(input, ['schemaVersion', 'topics', 'nodes', 'edges', 'review']);
+  record(input, ['schemaVersion', 'topics', 'nodes', 'edges', 'review', 'scope']);
   requireGraph(input.schemaVersion === 1);
   const topicIds = new Set(),
     nodeIds = new Set(),
@@ -133,6 +133,41 @@ export function validateRequirementGraph(input) {
     requireGraph(sources.length, '正式关系必须有明确PRD出处');
     return { ...item, label: string(item.label, 160), reason: string(item.reason, 2000), evidence: sources };
   });
+  let scope;
+  if (input.scope !== undefined) {
+    record(input.scope, ['description', 'excludedRequirements', 'excludedPrototypes']);
+    const requirementIds = new Set(),
+      prototypeIds = new Set();
+    scope = {
+      description: string(input.scope.description, 1000),
+      excludedRequirements: array(input.scope.excludedRequirements, 10000).map((item) => {
+        record(item, ['requirementId', 'revision', 'bindingRevision', 'reason']);
+        requireGraph(
+          validId(item.requirementId) && digest.test(item.revision) && digest.test(item.bindingRevision),
+        );
+        requireGraph(!requirementIds.has(item.requirementId));
+        requireGraph(
+          !nodes.some((node) => node.requirements.includes(item.requirementId)) &&
+            !edges.some((edge) =>
+              edge.evidence.some((source) => source.requirementId === item.requirementId),
+            ),
+        );
+        requirementIds.add(item.requirementId);
+        return { ...item, reason: string(item.reason, 500) };
+      }),
+      excludedPrototypes: array(input.scope.excludedPrototypes, 10000).map((item) => {
+        record(item, ['clientId', 'pageKey', 'revision', 'reason']);
+        requireGraph(validId(item.clientId) && validId(item.pageKey) && digest.test(item.revision));
+        const key = `${item.clientId}/${item.pageKey}`;
+        requireGraph(!prototypeIds.has(key));
+        requireGraph(
+          !nodes.some((node) => node.prototypes.some((page) => `${page.clientId}/${page.pageKey}` === key)),
+        );
+        prototypeIds.add(key);
+        return { ...item, reason: string(item.reason, 500) };
+      }),
+    };
+  }
   record(input.review, ['reviewedAt', 'graphRevision', 'requirements', 'bindings', 'prototypes', 'note']);
   requireGraph(input.review.graphRevision === undefined || digest.test(input.review.graphRevision));
   requireGraph(
@@ -150,6 +185,7 @@ export function validateRequirementGraph(input) {
     topics,
     nodes,
     edges,
+    ...(scope ? { scope } : {}),
     review: { ...input.review, note: string(input.review.note ?? '', 1000, true) },
   };
 }
@@ -172,7 +208,14 @@ export function requirementBindingRevision(document, files) {
   );
 }
 export function reviewedGraphRevision(graph) {
-  return graphHash(JSON.stringify({ topics: graph.topics, nodes: graph.nodes, edges: graph.edges }));
+  return graphHash(
+    JSON.stringify({
+      topics: graph.topics,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      ...(graph.scope ? { scope: graph.scope } : {}),
+    }),
+  );
 }
 function sectionText(markdown, anchor) {
   const lines = markdown.split('\n');
@@ -310,8 +353,30 @@ export function requirementGraphView(
       if (stale && current) diagnostics.push({ code: 'STALE_EDGE', edgeId: item.id });
       return { ...item, evidence: sources, stale };
     });
+  const graphScope = graph.scope
+    ? {
+        description: graph.scope.description,
+        excludedRequirements: graph.scope.excludedRequirements.filter((item) =>
+          visibleIds.has(item.requirementId),
+        ),
+        excludedPrototypes: graph.scope.excludedPrototypes.filter(
+          (item) =>
+            Object.hasOwn(snapshot.prototypeRevisions ?? {}, `${item.clientId}/${item.pageKey}`) &&
+            (!allowedPage || allowedPage(item)),
+        ),
+      }
+    : undefined;
   for (const doc of readable) {
-    if (!nodes.some((node) => node.requirements.includes(doc.id)))
+    const excluded = graphScope?.excludedRequirements.find((item) => item.requirementId === doc.id);
+    const currentExclusion =
+      excluded?.revision === doc.revision &&
+      excluded?.bindingRevision === requirementBindingRevision(doc, snapshot.files);
+    if (excluded && !currentExclusion) diagnostics.push({ code: 'STALE_SCOPE', requirementId: doc.id });
+    if (
+      !currentExclusion &&
+      !nodes.some((node) => node.requirements.includes(doc.id)) &&
+      !edges.some((edge) => edge.evidence.some((source) => source.requirementId === doc.id))
+    )
       diagnostics.push({ code: 'UNMAPPED_REQUIREMENT', requirementId: doc.id });
     if (
       graph.review.requirements[doc.id] !== doc.revision ||
@@ -331,6 +396,11 @@ export function requirementGraphView(
   for (const [key, revision] of Object.entries(snapshot.prototypeRevisions ?? {})) {
     const [clientId, pageKey] = key.split('/');
     if (allowedPage && !allowedPage({ clientId, pageKey })) continue;
+    const excluded = graphScope?.excludedPrototypes.find(
+      (item) => `${item.clientId}/${item.pageKey}` === key,
+    );
+    if (excluded?.revision === revision) continue;
+    if (excluded) diagnostics.push({ code: 'STALE_SCOPE', prototypeKey: key });
     if (!nodes.some((node) => node.prototypes.some((page) => `${page.clientId}/${page.pageKey}` === key)))
       diagnostics.push({ code: 'UNMAPPED_PROTOTYPE', prototypeKey: key });
     else if (graph.review.prototypes[key] !== revision)
@@ -350,12 +420,14 @@ export function requirementGraphView(
         nodes,
         edges,
         unique,
+        ...(graphScope ? { scope: graphScope } : {}),
       }),
     ),
     topics: graph.topics.filter((topic) => nodes.some((node) => node.topics.includes(topic.id))),
     nodes,
     edges,
     diagnostics: unique,
+    ...(graphScope ? { scope: graphScope } : {}),
     nodeTotal: nodes.length,
     edgeTotal: edges.length,
     complete: freshness === 'current' && !unique.length,
@@ -452,6 +524,15 @@ export function queryRequirementGraph(view, operation, args = {}) {
     accessScope: view.accessScope,
     reviewedAt: view.reviewedAt,
     vocabulary: view.vocabulary,
+    ...(view.scope
+      ? {
+          scope: {
+            description: view.scope.description,
+            excludedRequirementCount: view.scope.excludedRequirements.length,
+            excludedPrototypeCount: view.scope.excludedPrototypes.length,
+          },
+        }
+      : {}),
   };
   if (operation === 'get_requirement_graph') {
     const visible = available.filter((node) => !args.topic || node.topics.includes(args.topic));

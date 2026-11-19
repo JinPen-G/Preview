@@ -47,6 +47,13 @@ function FullscreenSurface({
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const host = useRef<HTMLDivElement | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
+  const insidePointers = useRef(new WeakSet<Event>());
+  useLayoutEffect(() => {
+    const surface = panel.current;
+    const remember = (event: Event) => insidePointers.current.add(event);
+    surface?.addEventListener('pointerdown', remember, true);
+    return () => surface?.removeEventListener('pointerdown', remember, true);
+  }, []);
   useLayoutEffect(() => {
     const update = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', update);
@@ -98,8 +105,9 @@ function FullscreenSurface({
           // physical containment is authoritative for this transferred mount.
           const target = event.detail.originalEvent.target;
           if (
-            target instanceof Node &&
-            (nativeRef.current?.contains(target) || screenPortals?.contains(target))
+            insidePointers.current.has(event.detail.originalEvent) ||
+            (target instanceof Node &&
+              (nativeRef.current?.contains(target) || screenPortals?.contains(target)))
           )
             event.preventDefault();
         }}

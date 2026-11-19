@@ -82,8 +82,24 @@ export type GraphNodeDefinition = Omit<
 export type GraphEdgeDefinition = Omit<GraphEdge, 'stale' | 'evidence'> & {
   evidence: Omit<GraphEvidence, 'stale'>[];
 };
+export interface GraphScope {
+  description: string;
+  excludedRequirements: {
+    requirementId: string;
+    revision: string;
+    bindingRevision: string;
+    reason: string;
+  }[];
+  excludedPrototypes: {
+    clientId: string;
+    pageKey: string;
+    revision: string;
+    reason: string;
+  }[];
+}
 export interface RequirementGraphDefinition {
   schemaVersion: 1;
+  scope?: GraphScope;
   topics: GraphTopic[];
   nodes: GraphNodeDefinition[];
   edges: GraphEdgeDefinition[];
@@ -104,6 +120,7 @@ export interface GraphDiagnostic {
   prototypeKey?: string;
 }
 export interface RequirementGraph {
+  scope?: GraphScope;
   vocabulary: {
     nodeTypes: GraphNodeType[];
     relations: Record<string, { label: string; propagation: string }>;

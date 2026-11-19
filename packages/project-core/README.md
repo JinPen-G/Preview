@@ -16,6 +16,10 @@
 
 本地作者使用 `RequirementGraphDefinition`。API 里的 `stale/requirementStatus`、计数、分页、可读范围与维护诊断是服务端派生字段，不能粘贴进作者 JSON。核对记录同时绑定图谱、需求、页面关联和源码修订，修改图谱本身也会产生未核对提醒。
 
+图谱可声明 `scope`：`description` 解释业务定位，`excludedRequirements` 和 `excludedPrototypes` 为主动不建模的资料保存身份、版本和理由。资料还需保存 `bindingRevision`。声明只免除同版本的未映射提醒，不视为需求已经复核；变更后产生 `STALE_SCOPE` 并恢复遗漏检查。权限投影先过滤这些记录，网页与MCP不会通过范围信息泄露不可读文档或页面。已引用的业务依据不能同时排除。
+
+总图返回完整范围清单；节点、搜索、路径和影响查询只返回范围描述及已授权的排除数量，避免在每次业务查询中重复附带无关资料。
+
 节点有稳定 ID、类型、主题集合、主要主题、生命周期、需求 ID、章节引用，以及 `none/partial/presented` 原型覆盖。引用保存 `requirementId/anchor/quote/revision`，原型保存 `clientId/pageKey/anchor/target/revision`。原型只表示交互画面的位置，不能据此推导生产实现。归属不是依赖；图谱响应同时返回 `vocabulary`，让远程 AI 获取关系传播方向和证据分类。
 
 主题可选`category: "business" | "management"`，分别用于业务线与共用管理导航，未声明的旧图谱仍兼容。RIMO按业务线归集需求，共享规则通过多个`topics`归属保留唯一ID；分类不新增连线、不改变传播方向，也不授予跨页面访问权限。网页和MCP读取同一分类信息。前台将关联功能节点单独列为“管理功能关联”，业务前因/后果仍按关系的传播方向判断。
